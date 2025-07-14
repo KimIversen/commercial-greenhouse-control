@@ -6,7 +6,7 @@ homeassistant:
   elevation: !secret elevation
   unit_system: metric
   time_zone: Europe/Oslo
-  country: NO
+  country: "NO"
 
 # HTTP with security
 http:
@@ -17,7 +17,7 @@ http:
   ip_ban_enabled: true
   login_attempts_threshold: 5
 
-# Database - High Performance MariaDB
+# Database – High-performance MariaDB
 recorder:
   db_url: !secret db_url
   purge_keep_days: 365
@@ -38,12 +38,8 @@ recorder:
       - switch.solenoid_*
       - switch.*_valve
 
-# MQTT
+# MQTT (broker credentials now set via the UI integration)
 mqtt:
-  broker: greenhouse_mosquitto
-  port: 1883
-  username: !secret mqtt_username
-  password: !secret mqtt_password
 
 # Notifications
 notify:
@@ -67,12 +63,14 @@ system_health:
 mobile_app:
 frontend:
 config:
-automation: !include automations.yaml
-script: !include scripts.yaml
-scene: !include scenes.yaml
 
-# System monitoring sensors
+automation: !include automations.yaml
+script:     !include scripts.yaml
+scene:      !include scenes.yaml
+
+# --------  SENSORS  --------
 sensor:
+  # System-monitor sensors
   - platform: systemmonitor
     resources:
       - type: disk_use_percent
@@ -84,24 +82,87 @@ sensor:
   - platform: uptime
     name: System Uptime
 
+  # Template sensors
+  - platform: template
+    sensors:
+      greenhouse_status:
+        friendly_name: "Greenhouse Status"
+        value_template: >
+          {% set issues = [] %}
+          {% if states('sensor.processor_use')  | int > 80 %} {% set issues = issues + ['High CPU'] %}{% endif %}
+          {% if states('sensor.memory_use_percent') | int > 80 %} {% set issues = issues + ['High Memory'] %}{% endif %}
+          {% if states('sensor.disk_use_percent') | int > 90 %} {% set issues = issues + ['Low Disk Space'] %}{% endif %}
+          {% if is_state('binary_sensor.low_soil_moisture_alert', 'on') %} {% set issues = issues + ['Low Soil Moisture'] %}{% endif %}
+          {{ 'Healthy' if issues | length == 0 else issues | join(', ') }}
+        icon_template: >
+          {% if is_state('binary_sensor.system_healthy','on')
+                and is_state('binary_sensor.low_soil_moisture_alert','off') %}
+            mdi:check-circle
+          {% else %}
+            mdi:alert-circle
+          {% endif %}
+
+      average_soil_moisture:
+        friendly_name: "Average Soil Moisture"
+        value_template: >
+          {% set values = [
+              states('sensor.soil_moisture_1') | float(0),
+              states('sensor.soil_moisture_2') | float(0),
+              states('sensor.soil_moisture_3') | float(0)
+          ] | select('gt', 0) | list %}
+          {{ (values | sum / values | length) | round(1)
+               if values | length > 0 else 'unavailable' }}
+        unit_of_measurement: "%"
+        icon: mdi:water-percent
+
+      average_soil_temperature:
+        friendly_name: "Average Soil Temperature"
+        value_template: >
+          {% set temps = [
+              states('sensor.soil_temperature_1') | float(-100),
+              states('sensor.soil_temperature_2') | float(-100),
+              states('sensor.soil_temperature_3') | float(-100)
+          ] | select('gt', -50) | list %}
+          {{ (temps | sum / temps | length) | round(1)
+               if temps | length > 0 else 'unavailable' }}
+        unit_of_measurement: "°C"
+        icon: mdi:thermometer
+
+# Binary sensors for system health
+binary_sensor:
+  - platform: template
+    sensors:
+      system_healthy:
+        friendly_name: "System Health Status"
+        value_template: >
+          {{ states('sensor.processor_use')  | int < 80 and
+             states('sensor.memory_use_percent') | int < 80 and
+             states('sensor.disk_use_percent')   | int < 90 }}
+        device_class: problem
+
+      low_soil_moisture_alert:
+        friendly_name: "Low Soil Moisture Alert"
+        value_template: >
+          {{ states('sensor.soil_moisture_1') | int < 25 or
+             states('sensor.soil_moisture_2') | int < 25 or
+             states('sensor.soil_moisture_3') | int < 25 }}
+        device_class: problem
+
 # Weather integration
 weather:
   - platform: yr
 
-# Input helpers for manual control
+# Input helpers
 input_boolean:
   emergency_mode:
     name: Emergency Mode
     icon: mdi:alert-octagon
-
   irrigation_enabled:
     name: Irrigation System Enabled
     icon: mdi:water
-
   manual_irrigation_tomato:
     name: Manual Tomato Irrigation
     icon: mdi:water
-
   manual_irrigation_chili:
     name: Manual Chili Irrigation
     icon: mdi:water
@@ -114,7 +175,6 @@ input_number:
     step: 5
     unit_of_measurement: "%"
     icon: mdi:water-percent
-
   irrigation_duration:
     name: Irrigation Duration
     min: 5
@@ -123,94 +183,7 @@ input_number:
     unit_of_measurement: "min"
     icon: mdi:timer
 
-# Binary sensors for system health
-binary_sensor:
-  - platform: template
-    sensors:
-      system_healthy:
-        friendly_name: "System Health Status"
-        value_template: >
-          {{ states('sensor.processor_use') | int < 80 and
-             states('sensor.memory_use_percent') | int < 80 and
-             states('sensor.disk_use_percent') | int < 90 }}
-        device_class: problem
-
-      low_soil_moisture_alert:
-        friendly_name: "Low Soil Moisture Alert"
-        value_template: >
-          {{ states('sensor.soil_moisture_1') | int < 25 or
-             states('sensor.soil_moisture_2') | int < 25 or
-             states('sensor.soil_moisture_3') | int < 25 }}
-        device_class: problem
-
-# Template sensors
-sensor:
-  - platform: template
-    sensors:
-      greenhouse_status:
-        friendly_name: "Greenhouse Status"
-        value_template: >
-          {% set issues = [] %}
-          {% if states('sensor.processor_use') | int > 80 %}
-            {% set issues = issues + ['High CPU'] %}
-          {% endif %}
-          {% if states('sensor.memory_use_percent') | int > 80 %}
-            {% set issues = issues + ['High Memory'] %}
-          {% endif %}
-          {% if states('sensor.disk_use_percent') | int > 90 %}
-            {% set issues = issues + ['Low Disk Space'] %}
-          {% endif %}
-          {% if states('binary_sensor.low_soil_moisture_alert') == 'on' %}
-            {% set issues = issues + ['Low Soil Moisture'] %}
-          {% endif %}
-          {% if issues | length == 0 %}
-            Healthy
-          {% else %}
-            {{ issues | join(', ') }}
-          {% endif %}
-        icon_template: >
-          {% if states('binary_sensor.system_healthy') == 'on' and 
-                states('binary_sensor.low_soil_moisture_alert') == 'off' %}
-            mdi:check-circle
-          {% else %}
-            mdi:alert-circle
-          {% endif %}
-
-      average_soil_moisture:
-        friendly_name: "Average Soil Moisture"
-        value_template: >
-          {% set moisture_sensors = [
-            states('sensor.soil_moisture_1') | float,
-            states('sensor.soil_moisture_2') | float,
-            states('sensor.soil_moisture_3') | float
-          ] %}
-          {% set valid_sensors = moisture_sensors | select('>', 0) | list %}
-          {% if valid_sensors | length > 0 %}
-            {{ (valid_sensors | sum / valid_sensors | length) | round(1) }}
-          {% else %}
-            unavailable
-          {% endif %}
-        unit_of_measurement: "%"
-        icon: "mdi:water-percent"
-
-      average_soil_temperature:
-        friendly_name: "Average Soil Temperature"
-        value_template: >
-          {% set temp_sensors = [
-            states('sensor.soil_temperature_1') | float,
-            states('sensor.soil_temperature_2') | float,
-            states('sensor.soil_temperature_3') | float
-          ] %}
-          {% set valid_sensors = temp_sensors | select('>', -50) | list %}
-          {% if valid_sensors | length > 0 %}
-            {{ (valid_sensors | sum / valid_sensors | length) | round(1) }}
-          {% else %}
-            unavailable
-          {% endif %}
-        unit_of_measurement: "°C"
-        icon: "mdi:thermometer"
-
-# Groups for easier management
+# Groups
 group:
   soil_moisture_sensors:
     name: Soil Moisture Sensors
@@ -243,7 +216,7 @@ group:
       - switch.chili_zone_valve
       - switch.venturi_bypass_valve
 
-# Zones for organization
+# Zones
 zone:
   - name: Greenhouse
     latitude: !secret latitude
