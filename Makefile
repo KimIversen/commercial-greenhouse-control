@@ -2,9 +2,9 @@
 # Usage: make <target>
 
 # Configuration
-GITHUB_USER := kimiversen
+GITHUB_USER := KimIversen
 REPO_NAME := commercial-greenhouse-control
-GITHUB_URL := https://raw.githubusercontent.com/$(GITHUB_USER)/$(REPO_NAME)/refs/heads/main
+GITHUB_URL := https://raw.githubusercontent.com/$(GITHUB_USER)/$(REPO_NAME)/main
 COMPOSE_FILE := docker-compose.yml
 
 # Colors for output
