@@ -1,1 +1,198 @@
+esphome:
+  name: greenhouse-fan-controller-1  # Change to -2 for second fan
+  friendly_name: "Greenhouse Fan Controller 1"
 
+esp32:
+  board: seeed_xiao_esp32c3
+  framework:
+    type: arduino
+
+# Enable logging
+logger:
+  level: INFO
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "your-32-character-api-key-here"
+
+ota:
+  password: "your-ota-password-here"
+
+wifi:
+  ssid: "Your-WiFi-SSID"
+  password: "Your-WiFi-Password"
+  fast_connect: true
+  power_save_mode: none  # Ensure reliable communication for emergency control
+
+  # Enable fallback hotspot
+  ap:
+    ssid: "Fan-Controller-1 Fallback"
+    password: "fallback-password"
+
+captive_portal:
+
+# MQTT for communication with main system
+mqtt:
+  broker: your-mqtt-broker-ip
+  username: !secret mqtt_username
+  password: !secret mqtt_password
+  topic_prefix: greenhouse/fan1
+
+# DHT22 sensor for local temperature monitoring
+sensor:
+  - platform: dht
+    pin: GPIO3
+    model: DHT22
+    temperature:
+      name: "Fan Zone 1 Temperature"
+      id: local_temperature
+      accuracy_decimals: 1
+      filters:
+        - sliding_window_moving_average:
+            window_size: 5
+            send_every: 5
+      on_value:
+        then:
+          # Check for emergency temperature condition
+          - if:
+              condition:
+                lambda: 'return x >= 35.0;'
+              then:
+                # Emergency override - turn on fan immediately
+                - logger.log: "EMERGENCY: Temperature >= 35°C, activating fan override"
+                - switch.turn_on: emergency_override
+                - fan.turn_on: 
+                    id: exhaust_fan
+                    speed: 100  # Full speed
+                - mqtt.publish:
+                    topic: greenhouse/alerts/emergency
+                    payload: !lambda |-
+                      return "EMERGENCY: Fan 1 activated - Temperature: " + to_string(x) + "°C";
+          - if:
+              condition:
+                lambda: 'return x < 30.0;'
+              then:
+                # Temperature back to safe levels
+                - if:
+                    condition:
+                      switch.is_on: emergency_override
+                    then:
+                      - logger.log: "Temperature normalized, disabling emergency override"
+                      - switch.turn_off: emergency_override
+                      - mqtt.publish:
+                          topic: greenhouse/alerts/emergency
+                          payload: "Fan 1 emergency override disabled - Temperature normalized"
+    
+    humidity:
+      name: "Fan Zone 1 Humidity"
+      id: local_humidity
+      accuracy_decimals: 1
+
+  # WiFi Signal Strength
+  - platform: wifi_signal
+    name: "Fan Controller 1 WiFi Signal"
+    update_interval: 60s
+
+  # Uptime
+  - platform: uptime
+    name: "Fan Controller 1 Uptime"
+    update_interval: 60s
+
+# Fan control (PWM speed control)
+fan:
+  - platform: speed
+    id: exhaust_fan
+    name: "Exhaust Fan 1"
+    output: fan_pwm
+    speed_count: 100  # 0-100% speed control
+
+# PWM output for fan speed control
+output:
+  - platform: ledc
+    id: fan_pwm
+    pin: GPIO5
+    frequency: 25000Hz  # 25kHz PWM frequency
+    min_power: 0.0
+    max_power: 1.0
+
+# Binary sensors
+binary_sensor:
+  - platform: status
+    name: "Fan Controller 1 Status"
+
+# Switches
+switch:
+  - platform: restart
+    name: "Fan Controller 1 Restart"
+
+  # Emergency override switch
+  - platform: template
+    name: "Emergency Override"
+    id: emergency_override
+    icon: "mdi:alert-octagon"
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    
+# Text sensors
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "Fan Controller 1 IP Address"
+    ssid:
+      name: "Fan Controller 1 Connected SSID"
+
+# Status LED
+status_led:
+  pin:
+    number: GPIO2
+    inverted: true
+
+# Automations for normal operation (when not in emergency)
+automation:
+  # Respond to MQTT commands when not in emergency override
+  - platform: mqtt
+    topic: greenhouse/fan1/speed
+    then:
+      - if:
+          condition:
+            switch.is_off: emergency_override
+          then:
+            - fan.turn_on:
+                id: exhaust_fan
+                speed: !lambda 'return atoi(x.c_str());'
+          else:
+            - logger.log: "Ignoring MQTT command - Emergency override active"
+
+  # Turn off fan via MQTT (only if not emergency)
+  - platform: mqtt
+    topic: greenhouse/fan1/off
+    then:
+      - if:
+          condition:
+            switch.is_off: emergency_override
+          then:
+            - fan.turn_off: exhaust_fan
+          else:
+            - logger.log: "Ignoring MQTT off command - Emergency override active"
+
+# Heartbeat to main system
+interval:
+  - interval: 30s
+    then:
+      - mqtt.publish:
+          topic: greenhouse/fan1/heartbeat
+          payload: !lambda |-
+            return "temp:" + to_string(id(local_temperature).state) + 
+                   ",humidity:" + to_string(id(local_humidity).state) + 
+                   ",emergency:" + (id(emergency_override).state ? "true" : "false") +
+                   ",fan_speed:" + to_string(id(exhaust_fan).speed);
+
+# Boot sequence
+on_boot:
+  then:
+    - delay: 10s
+    - mqtt.publish:
+        topic: greenhouse/fan1/status
+        payload: "Fan Controller 1 Online"
+    - logger.log: "Fan Controller 1 started successfully"
