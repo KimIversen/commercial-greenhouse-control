@@ -177,6 +177,15 @@ check-updates:
 	@echo "$(YELLOW)🔍 Checking for updates...$(NC)"
 	@echo "Current repository: $(GITHUB_URL)"
 	@echo "Checking GitHub connectivity..."
+	# Uses curl’s --write-out to capture the final status code after redirects
+	@if code=$$(curl -s -o /dev/null -w '%{http_code}' -L $(GITHUB_URL)/README.md); \
+   	[ "$$code" -lt 400 ]; then \
+        	printf '%b\n' '$(GREEN)✅ GitHub repository accessible$(NC)'; \
+   	else \
+        	printf '%b\n' '$(RED)❌ GitHub returned HTTP $$code$(NC)'; \
+        	exit 1; \
+   	fi
+
 	@if curl -s --head $(GITHUB_URL)/README.md | head -n 1 | grep -q "200 OK"; then \
 		echo "$(GREEN)✅ GitHub repository accessible$(NC)"; \
 	else \
