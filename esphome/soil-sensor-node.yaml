@@ -1,1 +1,268 @@
+esphome:
+  name: soil-sensor-node-1  # Change to -2, -3, etc. for additional nodes
+  friendly_name: "Soil Sensor Node 1"
 
+esp32:
+  board: seeed_xiao_esp32c3
+  framework:
+    type: arduino
+
+# Enable logging (reduce level for battery savings)
+logger:
+  level: WARN
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "your-32-character-api-key-here"
+
+ota:
+  password: "your-ota-password-here"
+
+wifi:
+  ssid: "Your-WiFi-SSID"
+  password: "Your-WiFi-Password"
+  
+  # Fast connect to save power
+  fast_connect: true
+  
+  # Power save mode
+  power_save_mode: LIGHT
+
+  # Enable fallback hotspot
+  ap:
+    ssid: "Soil-Node-1 Fallback"
+    password: "fallback-password"
+
+captive_portal:
+
+# Time component for smart scheduling
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+    timezone: "Europe/Oslo"
+
+# Global variables for scheduling
+globals:
+  - id: next_sleep_duration
+    type: int
+    initial_value: '7200'  # Default 2 hours
+
+# Deep sleep with dynamic duration
+deep_sleep:
+  id: deep_sleep_control
+  run_duration: 60s  # Stay awake for 60 seconds
+  sleep_duration: 7200s  # Will be overridden by smart scheduling
+
+# Dallas temperature sensor setup (1-wire bus)
+dallas:
+  - pin: GPIO3
+    update_interval: 10s
+
+# Sensors
+sensor:
+  # Battery voltage monitoring (via voltage divider)
+  - platform: adc
+    pin: A3
+    name: "Battery Voltage"
+    id: battery_voltage
+    update_interval: 10s
+    accuracy_decimals: 2
+    filters:
+      - multiply: 2.0  # Adjust based on your voltage divider
+    unit_of_measurement: "V"
+    icon: "mdi:battery"
+
+  # Battery percentage (calculated from voltage)
+  - platform: template
+    name: "Battery Percentage"
+    lambda: |-
+      float voltage = id(battery_voltage).state;
+      if (voltage < 6.0) return 0.0;      // 3.0V per cell (empty)
+      if (voltage > 8.4) return 100.0;    // 4.2V per cell (full)
+      return (voltage - 6.0) / 2.4 * 100.0;
+    update_interval: 10s
+    unit_of_measurement: "%"
+    icon: "mdi:battery-outline"
+
+  # WiFi Signal Strength
+  - platform: wifi_signal
+    name: "WiFi Signal"
+    update_interval: 10s
+
+  # Capacitive soil moisture sensors (analog)
+  - platform: adc
+    pin: A0
+    name: "Soil Moisture 1"
+    id: soil_moisture_1
+    update_interval: 5s
+    accuracy_decimals: 1
+    filters:
+      - calibrate_linear:
+          # Calibrate these values for your sensors:
+          # Dry air reading -> 0%, Water reading -> 100%
+          - 2.8 -> 0.0
+          - 1.2 -> 100.0
+      - lambda: return max(0.0f, min(100.0f, x));
+    unit_of_measurement: "%"
+    icon: "mdi:water-percent"
+
+  - platform: adc
+    pin: A1
+    name: "Soil Moisture 2"
+    id: soil_moisture_2
+    update_interval: 5s
+    accuracy_decimals: 1
+    filters:
+      - calibrate_linear:
+          - 2.8 -> 0.0
+          - 1.2 -> 100.0
+      - lambda: return max(0.0f, min(100.0f, x));
+    unit_of_measurement: "%"
+    icon: "mdi:water-percent"
+
+  - platform: adc
+    pin: A2
+    name: "Soil Moisture 3"
+    id: soil_moisture_3
+    update_interval: 5s
+    accuracy_decimals: 1
+    filters:
+      - calibrate_linear:
+          - 2.8 -> 0.0
+          - 1.2 -> 100.0
+      - lambda: return max(0.0f, min(100.0f, x));
+    unit_of_measurement: "%"
+    icon: "mdi:water-percent"
+
+  # DS18B20 temperature sensors
+  - platform: dallas
+    address: 0x28FF1234567890A1  # Replace with actual sensor address
+    name: "Soil Temperature 1"
+    id: soil_temperature_1
+    filters:
+      - offset: 0.0
+    unit_of_measurement: "°C"
+    icon: "mdi:thermometer"
+
+  - platform: dallas
+    address: 0x28FF1234567890A2  # Replace with actual sensor address
+    name: "Soil Temperature 2"
+    id: soil_temperature_2
+    filters:
+      - offset: 0.0
+    unit_of_measurement: "°C"
+    icon: "mdi:thermometer"
+
+  - platform: dallas
+    address: 0x28FF1234567890A3  # Replace with actual sensor address
+    name: "Soil Temperature 3"
+    id: soil_temperature_3
+    filters:
+      - offset: 0.0
+    unit_of_measurement: "°C"
+    icon: "mdi:thermometer"
+
+# Binary sensors
+binary_sensor:
+  - platform: status
+    name: "Status"
+
+# Text sensors
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "IP Address"
+      update_interval: 30s
+      
+  # Current schedule info
+  - platform: template
+    name: "Next Wake Schedule"
+    id: next_wake_info
+    update_interval: 30s
+
+# Switches
+switch:
+  - platform: restart
+    name: "Restart"
+    
+  # Switch to disable deep sleep for debugging
+  - platform: template
+    name: "Prevent Deep Sleep"
+    id: prevent_deep_sleep
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    turn_on_action:
+      - deep_sleep.prevent: deep_sleep_control
+    turn_off_action:
+      - deep_sleep.allow: deep_sleep_control
+
+# Smart scheduling logic
+interval:
+  - interval: 50s  # Run 50 seconds after wake-up
+    then:
+      - lambda: |-
+          auto time = id(homeassistant_time).now();
+          if (!time.is_valid()) {
+            ESP_LOGW("schedule", "Time not available, using default 2h sleep");
+            id(next_sleep_duration) = 7200;
+            return;
+          }
+          
+          int hour = time.hour;
+          int next_sleep = 7200; // Default 2 hours
+          std::string next_wake_msg = "Unknown";
+          
+          ESP_LOGI("schedule", "Current time: %02d:%02d", hour, time.minute);
+          
+          if (hour >= 6 && hour < 22) {
+            // Daytime: 6 AM to 10 PM - measure every 2 hours
+            next_sleep = 7200; // 2 hours
+            int next_hour = ((hour - 6) / 2 + 1) * 2 + 6;
+            if (next_hour >= 22) next_hour = 22;
+            next_wake_msg = "Next: " + to_string(next_hour) + ":00 (Day schedule)";
+          } else if (hour == 22) {
+            // 10 PM - sleep until 2 AM (4 hours)
+            next_sleep = 14400; // 4 hours
+            next_wake_msg = "Next: 02:00 (Night check)";
+          } else if (hour == 2) {
+            // 2 AM - sleep until 6 AM (4 hours)
+            next_sleep = 14400; // 4 hours
+            next_wake_msg = "Next: 06:00 (Day starts)";
+          } else {
+            // Other times - go to next scheduled time
+            if (hour >= 23 || hour < 2) {
+              // Sleep until 2 AM
+              int hours_to_2am = (2 - hour + 24) % 24;
+              if (hour >= 23) hours_to_2am = 2 + (24 - hour);
+              next_sleep = hours_to_2am * 3600;
+              next_wake_msg = "Next: 02:00 (Night check)";
+            } else {
+              // Sleep until 6 AM
+              int hours_to_6am = 6 - hour;
+              next_sleep = hours_to_6am * 3600;
+              next_wake_msg = "Next: 06:00 (Day starts)";
+            }
+          }
+          
+          ESP_LOGI("schedule", "Sleep duration: %d seconds (%d hours)", next_sleep, next_sleep/3600);
+          id(next_sleep_duration) = next_sleep;
+          id(next_wake_info).publish_state(next_wake_msg);
+          
+      - delay: 5s
+      - lambda: |-
+          ESP_LOGI("schedule", "Entering deep sleep for %d seconds", id(next_sleep_duration));
+          id(deep_sleep_control).set_sleep_duration(id(next_sleep_duration) * 1000);
+      - deep_sleep.enter: deep_sleep_control
+
+# Boot sequence - log schedule info
+on_boot:
+  then:
+    - delay: 30s  # Wait for time sync
+    - lambda: |-
+        auto time = id(homeassistant_time).now();
+        if (time.is_valid()) {
+          ESP_LOGI("boot", "Device woke up at %02d:%02d", time.hour, time.minute);
+        } else {
+          ESP_LOGI("boot", "Device woke up, waiting for time sync");
+        }
