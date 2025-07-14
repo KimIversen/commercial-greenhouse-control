@@ -23,20 +23,6 @@ recorder:
   purge_keep_days: 365
   auto_purge: true
   commit_interval: 1
-  include:
-    domains:
-      - sensor
-      - binary_sensor
-      - switch
-      - automation
-      - fan
-    entity_globs:
-      - sensor.soil_*
-      - sensor.tank_*
-      - sensor.fan_*
-      - sensor.battery_*
-      - switch.solenoid_*
-      - switch.*_valve
 
 # MQTT (broker credentials now set via the UI integration)
 mqtt:
