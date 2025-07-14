@@ -1,1 +1,347 @@
+esphome:
+  name: greenhouse-valve-controller
+  friendly_name: "Greenhouse Valve Controller"
 
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: arduino
+
+# Enable logging
+logger:
+  level: INFO
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "your-32-character-api-key-here"
+
+ota:
+  password: "your-ota-password-here"
+
+wifi:
+  ssid: "Your-WiFi-SSID"
+  password: "Your-WiFi-Password"
+  fast_connect: true
+  power_save_mode: none
+
+  ap:
+    ssid: "Valve-Controller Fallback"
+    password: "fallback-password"
+
+captive_portal:
+
+# MQTT for coordination with other systems
+mqtt:
+  broker: your-mqtt-broker-ip
+  username: !secret mqtt_username
+  password: !secret mqtt_password
+  topic_prefix: greenhouse/valves
+
+# Ultrasonic sensors for tank levels
+sensor:
+  # Main water tank
+  - platform: ultrasonic
+    trigger_pin: GPIO11
+    echo_pin: GPIO12
+    name: "Main Water Tank Level"
+    id: main_tank_level
+    update_interval: 30s
+    unit_of_measurement: "cm"
+    accuracy_decimals: 1
+    filters:
+      - sliding_window_moving_average:
+          window_size: 3
+
+  # Tank A (Calcinit)
+  - platform: ultrasonic
+    trigger_pin: GPIO13
+    echo_pin: GPIO14
+    name: "Tank A Calcinit Level"
+    id: tank_a_level
+    update_interval: 30s
+    unit_of_measurement: "cm"
+    accuracy_decimals: 1
+
+  # Tank B (Nutrients)
+  - platform: ultrasonic
+    trigger_pin: GPIO15
+    echo_pin: GPIO16
+    name: "Tank B Nutrients Level"
+    id: tank_b_level
+    update_interval: 30s
+    unit_of_measurement: "cm"
+    accuracy_decimals: 1
+
+  # Tank C (Mixed solution)
+  - platform: ultrasonic
+    trigger_pin: GPIO17
+    echo_pin: GPIO18
+    name: "Tank C Mixed Level"
+    id: tank_c_level
+    update_interval: 30s
+    unit_of_measurement: "cm"
+    accuracy_decimals: 1
+
+  # System monitoring
+  - platform: wifi_signal
+    name: "Valve Controller WiFi Signal"
+    update_interval: 60s
+
+  - platform: uptime
+    name: "Valve Controller Uptime"
+    update_interval: 60s
+
+# Template sensors for tank percentages (assuming 100cm = empty, 20cm = full)
+  - platform: template
+    name: "Main Tank Percentage"
+    lambda: |-
+      float level = id(main_tank_level).state;
+      if (isnan(level)) return {};
+      float percentage = ((100.0 - level) / 80.0) * 100.0;
+      return max(0.0f, min(100.0f, percentage));
+    unit_of_measurement: "%"
+    accuracy_decimals: 0
+
+  - platform: template
+    name: "Tank A Percentage"
+    lambda: |-
+      float level = id(tank_a_level).state;
+      if (isnan(level)) return {};
+      float percentage = ((100.0 - level) / 80.0) * 100.0;
+      return max(0.0f, min(100.0f, percentage));
+    unit_of_measurement: "%"
+    accuracy_decimals: 0
+
+  - platform: template
+    name: "Tank B Percentage"
+    lambda: |-
+      float level = id(tank_b_level).state;
+      if (isnan(level)) return {};
+      float percentage = ((100.0 - level) / 80.0) * 100.0;
+      return max(0.0f, min(100.0f, percentage));
+    unit_of_measurement: "%"
+    accuracy_decimals: 0
+
+  - platform: template
+    name: "Tank C Percentage"
+    lambda: |-
+      float level = id(tank_c_level).state;
+      if (isnan(level)) return {};
+      float percentage = ((100.0 - level) / 80.0) * 100.0;
+      return max(0.0f, min(100.0f, percentage));
+    unit_of_measurement: "%"
+    accuracy_decimals: 0
+
+# Binary sensors
+binary_sensor:
+  - platform: status
+    name: "Valve Controller Status"
+
+# Solenoid valve controls using TB6612FNG
+switch:
+  # Solenoid A (Main tank to pump)
+  - platform: template
+    name: "Solenoid A - Main Tank"
+    id: solenoid_a
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    turn_on_action:
+      - logger.log: "Opening Solenoid A (Main Tank)"
+      - output.turn_on: solenoid_a_pin1
+      - output.turn_off: solenoid_a_pin2
+      - delay: 100ms
+      - output.turn_off: solenoid_a_pin1
+    turn_off_action:
+      - logger.log: "Closing Solenoid A (Main Tank)"
+      - output.turn_off: solenoid_a_pin1
+      - output.turn_on: solenoid_a_pin2
+      - delay: 100ms
+      - output.turn_off: solenoid_a_pin2
+
+  # Solenoid B (Tank C to pump)
+  - platform: template
+    name: "Solenoid B - Tank C"
+    id: solenoid_b
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    turn_on_action:
+      - logger.log: "Opening Solenoid B (Tank C)"
+      - output.turn_on: solenoid_b_pin1
+      - output.turn_off: solenoid_b_pin2
+      - delay: 100ms
+      - output.turn_off: solenoid_b_pin1
+    turn_off_action:
+      - logger.log: "Closing Solenoid B (Tank C)"
+      - output.turn_off: solenoid_b_pin1
+      - output.turn_on: solenoid_b_pin2
+      - delay: 100ms
+      - output.turn_off: solenoid_b_pin2
+
+  # Tomato zone valve
+  - platform: template
+    name: "Tomato Zone Valve"
+    id: tomato_valve
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    turn_on_action:
+      - logger.log: "Opening Tomato Zone Valve"
+      - output.turn_on: tomato_valve_pin1
+      - output.turn_off: tomato_valve_pin2
+      - delay: 100ms
+      - output.turn_off: tomato_valve_pin1
+    turn_off_action:
+      - logger.log: "Closing Tomato Zone Valve"
+      - output.turn_off: tomato_valve_pin1
+      - output.turn_on: tomato_valve_pin2
+      - delay: 100ms
+      - output.turn_off: tomato_valve_pin2
+
+  # Chili zone valve
+  - platform: template
+    name: "Chili Zone Valve"
+    id: chili_valve
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    turn_on_action:
+      - logger.log: "Opening Chili Zone Valve"
+      - output.turn_on: chili_valve_pin1
+      - output.turn_off: chili_valve_pin2
+      - delay: 100ms
+      - output.turn_off: chili_valve_pin1
+    turn_off_action:
+      - logger.log: "Closing Chili Zone Valve"
+      - output.turn_off: chili_valve_pin1
+      - output.turn_on: chili_valve_pin2
+      - delay: 100ms
+      - output.turn_off: chili_valve_pin2
+
+  # Venturi bypass valve
+  - platform: template
+    name: "Venturi Bypass Valve"
+    id: venturi_bypass
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    turn_on_action:
+      - logger.log: "Opening Venturi Bypass"
+      - output.turn_on: venturi_bypass_pin1
+      - output.turn_off: venturi_bypass_pin2
+      - delay: 100ms
+      - output.turn_off: venturi_bypass_pin1
+    turn_off_action:
+      - logger.log: "Closing Venturi Bypass"
+      - output.turn_off: venturi_bypass_pin1
+      - output.turn_on: venturi_bypass_pin2
+      - delay: 100ms
+      - output.turn_off: venturi_bypass_pin2
+
+  - platform: restart
+    name: "Valve Controller Restart"
+
+# GPIO outputs for TB6612FNG control
+output:
+  # Solenoid A control pins
+  - platform: gpio
+    pin: GPIO1
+    id: solenoid_a_pin1
+  - platform: gpio
+    pin: GPIO2
+    id: solenoid_a_pin2
+
+  # Solenoid B control pins
+  - platform: gpio
+    pin: GPIO3
+    id: solenoid_b_pin1
+  - platform: gpio
+    pin: GPIO4
+    id: solenoid_b_pin2
+
+  # Tomato valve control pins
+  - platform: gpio
+    pin: GPIO5
+    id: tomato_valve_pin1
+  - platform: gpio
+    pin: GPIO6
+    id: tomato_valve_pin2
+
+  # Chili valve control pins
+  - platform: gpio
+    pin: GPIO7
+    id: chili_valve_pin1
+  - platform: gpio
+    pin: GPIO8
+    id: chili_valve_pin2
+
+  # Venturi bypass control pins
+  - platform: gpio
+    pin: GPIO9
+    id: venturi_bypass_pin1
+  - platform: gpio
+    pin: GPIO10
+    id: venturi_bypass_pin2
+
+# Status LED
+status_led:
+  pin:
+    number: GPIO19
+    inverted: false
+
+# Text sensors
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "Valve Controller IP Address"
+
+# Script for irrigation sequences
+script:
+  # Mix fertilizer script
+  - id: mix_fertilizer
+    then:
+      - logger.log: "Starting fertilizer mixing cycle"
+      # Close all irrigation valves first
+      - switch.turn_off: tomato_valve
+      - switch.turn_off: chili_valve
+      - switch.turn_off: venturi_bypass
+      - delay: 1s
+      # Open main tank and close tank C
+      - switch.turn_on: solenoid_a
+      - switch.turn_off: solenoid_b
+      - delay: 2s
+      # Mix for specified duration (will be called with parameter)
+      - logger.log: "Mixing in progress..."
+      
+  # Irrigate script
+  - id: irrigate_zones
+    then:
+      - logger.log: "Starting irrigation cycle"
+      # Close main tank and open tank C
+      - switch.turn_off: solenoid_a
+      - switch.turn_on: solenoid_b
+      # Open venturi bypass to send mixed solution directly to crops
+      - switch.turn_on: venturi_bypass
+      - delay: 1s
+      # Zone valves will be controlled separately by Home Assistant
+
+# Heartbeat and status reporting
+interval:
+  - interval: 30s
+    then:
+      - mqtt.publish:
+          topic: greenhouse/valves/status
+          payload: !lambda |-
+            return "main_tank:" + to_string(id(main_tank_level).state) + 
+                   ",tank_a:" + to_string(id(tank_a_level).state) +
+                   ",tank_b:" + to_string(id(tank_b_level).state) +
+                   ",tank_c:" + to_string(id(tank_c_level).state);
+
+# Boot sequence
+on_boot:
+  then:
+    - delay: 10s
+    # Ensure all valves are closed on startup
+    - switch.turn_off: solenoid_a
+    - switch.turn_off: solenoid_b
+    - switch.turn_off: tomato_valve
+    - switch.turn_off: chili_valve
+    - switch.turn_off: venturi_bypass
+    - logger.log: "Valve Controller started - All valves closed"
