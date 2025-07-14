@@ -186,14 +186,6 @@ check-updates:
         	exit 1; \
    	fi
 
-	@if curl -s --head $(GITHUB_URL)/README.md | head -n 1 | grep -q "200 OK"; then \
-		echo "$(GREEN)✅ GitHub repository accessible$(NC)"; \
-	else \
-		echo "$(RED)❌ Cannot access GitHub repository$(NC)"; \
-		echo "Please check your internet connection and repository URL"; \
-		exit 1; \
-	fi
-
 # Install make if not present
 install-make:
 	@echo "$(YELLOW)📦 Installing make...$(NC)"
