@@ -33,7 +33,7 @@ services:
       timeout: 5s
       retries: 3
     networks:
-      - greenhouse_net
+      - greenhouse_greenhouse_net
     logging:
       driver: "json-file"
       options:
@@ -69,7 +69,7 @@ services:
         max-size: "50m"
         max-file: "5"
     networks:
-      - greenhouse_net
+      - greenhouse_greenhouse_net
 
   # ESPHome - Microcontroller Management
   esphome:
