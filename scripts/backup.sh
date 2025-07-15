@@ -49,6 +49,7 @@ fi
 log_backup "Backing up configuration files..."
 tar -czf "$BACKUP_DIR/greenhouse_config_${DATE}.tar.gz" \
     -C /opt/greenhouse \
+    --exclude='config/homeassistant/.storage' \
     config/ \
     docker-compose.yml \
     .env \
