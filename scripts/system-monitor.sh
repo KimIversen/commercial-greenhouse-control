@@ -137,14 +137,14 @@ check_database() {
 
 # Function to check Home Assistant API
 check_homeassistant() {
-    local ha_status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8123/api/ --connect-timeout 10 || echo "000")
+    local ha_status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8123/manifest.json --connect-timeout 10 || echo "000")
     
     if [ "$ha_status" != "200" ]; then
-        send_alert "CRITICAL" "Home Assistant API Error" "Home Assistant API returned status code: $ha_status"
+        send_alert "CRITICAL" "Home Assistant API Error" "Home Assistant returned status code: $ha_status"
         return 1
     fi
     
-    log_message "Home Assistant Status - API: OK (200)"
+    log_message "Home Assistant Status - Service: OK (200)"
 }
 
 # Function to check network connectivity
