@@ -29,8 +29,8 @@ mqtt:
 
 # Notifications
 notify:
-  - name: critical_alerts
-    platform: smtp
+  - platform: smtp
+    name: critical_alerts
     server: !secret smtp_server
     port: 587
     sender: !secret smtp_sender
