@@ -68,7 +68,7 @@ check_containers() {
     if [ ${#failed_containers[@]} -gt 0 ]; then
         send_alert "CRITICAL" "Container Issues" "Failed/unhealthy containers: ${failed_containers[*]}"
         log_message "Attempting to restart failed containers..."
-        cd /opt/greenhouse && docker-compose up -d "${failed_containers[@]}"
+        cd /opt/greenhouse && docker-compose restart "${failed_containers[@]#greenhouse_}"
         return 1
     else
         log_message "All containers: Running and healthy"
