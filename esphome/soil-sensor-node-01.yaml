@@ -1,0 +1,254 @@
+# XIAO ESP32-C3 Greenhouse Sensor Node
+# 3x Soil Moisture + 3x Temperature + Battery Monitoring
+
+esphome:
+  name: greenhouse-sensor-01
+  friendly_name: "Greenhouse Sensor Node 01"
+  platformio_options:
+    board_build.flash_mode: dio
+
+esp32:
+  board: seeed_xiao_esp32c3
+  variant: esp32c3
+  framework:
+    type: esp-idf
+    version: recommended
+
+# Enable logging
+logger:
+  level: INFO
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+# Enable OTA updates
+ota:
+  password: !secret ota_password
+
+# WiFi configuration
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  
+  # Enable fallback hotspot if WiFi fails
+  ap:
+    ssid: "Greenhouse-Sensor-01"
+    password: !secret ap_password
+
+# Captive portal for configuration
+captive_portal:
+
+# Status LED
+status_led:
+  pin: GPIO21  # D6
+
+# Deep sleep configuration for battery saving
+deep_sleep:
+  id: deep_sleep_1
+  run_duration: 30s  # Wake up for 30 seconds
+  sleep_duration: 10min  # Sleep for 10 minutes
+  
+# 1-Wire bus for temperature sensors
+one_wire:
+  - platform: gpio
+    pin: GPIO5  # D3
+
+# Sensors
+sensor:
+  # Soil Moisture Sensors (Capacitive)
+  - platform: adc
+    pin: GPIO2  # D0/A0
+    name: "Soil Moisture Zone 1"
+    id: soil_moisture_1
+    update_interval: 10s
+    attenuation: 11db
+    filters:
+      - calibrate_linear:
+          # Calibrate based on your sensors (dry to wet)
+          - 2.8 -> 0.0    # Dry (adjust based on testing)
+          - 1.2 -> 100.0  # Wet (adjust based on testing)
+      - lambda: |-
+          if (x < 0) return 0;
+          if (x > 100) return 100;
+          return x;
+    unit_of_measurement: "%"
+    accuracy_decimals: 1
+    icon: "mdi:water-percent"
+    
+  - platform: adc
+    pin: GPIO3  # D1/A1
+    name: "Soil Moisture Zone 2"
+    id: soil_moisture_2
+    update_interval: 10s
+    attenuation: 11db
+    filters:
+      - calibrate_linear:
+          - 2.8 -> 0.0
+          - 1.2 -> 100.0
+      - lambda: |-
+          if (x < 0) return 0;
+          if (x > 100) return 100;
+          return x;
+    unit_of_measurement: "%"
+    accuracy_decimals: 1
+    icon: "mdi:water-percent"
+    
+  - platform: adc
+    pin: GPIO4  # D2/A2
+    name: "Soil Moisture Zone 3"
+    id: soil_moisture_3
+    update_interval: 10s
+    attenuation: 11db
+    filters:
+      - calibrate_linear:
+          - 2.8 -> 0.0
+          - 1.2 -> 100.0
+      - lambda: |-
+          if (x < 0) return 0;
+          if (x > 100) return 100;
+          return x;
+    unit_of_measurement: "%"
+    accuracy_decimals: 1
+    icon: "mdi:water-percent"
+
+  # Temperature Sensors (DS18B20)
+  - platform: dallas
+    one_wire_id: gpio5
+    name: "Soil Temperature Zone 1"
+    id: soil_temp_1
+    address: 0x1c0000031edd2a28  # Replace with actual address
+    update_interval: 10s
+    accuracy_decimals: 1
+    icon: "mdi:thermometer"
+    
+  - platform: dallas
+    one_wire_id: gpio5
+    name: "Soil Temperature Zone 2"
+    id: soil_temp_2
+    address: 0x1c0000031edd2a29  # Replace with actual address
+    update_interval: 10s
+    accuracy_decimals: 1
+    icon: "mdi:thermometer"
+    
+  - platform: dallas
+    one_wire_id: gpio5
+    name: "Soil Temperature Zone 3"
+    id: soil_temp_3
+    address: 0x1c0000031edd2a30  # Replace with actual address
+    update_interval: 10s
+    accuracy_decimals: 1
+    icon: "mdi:thermometer"
+
+  # Battery Monitoring
+  - platform: adc
+    pin: GPIO20  # D7 - or use built-in battery sense if available
+    name: "Battery Voltage"
+    id: battery_voltage
+    update_interval: 60s
+    attenuation: 11db
+    filters:
+      - multiply: 2.0  # Voltage divider ratio (adjust based on your circuit)
+      - calibrate_linear:
+          - 0.0 -> 0.0
+          - 4.2 -> 4.2
+    unit_of_measurement: "V"
+    accuracy_decimals: 2
+    icon: "mdi:battery"
+    
+  - platform: template
+    name: "Battery Percentage"
+    id: battery_percentage
+    lambda: |-
+      float voltage = id(battery_voltage).state;
+      if (voltage > 4.1) return 100.0;
+      if (voltage > 3.9) return 80.0;
+      if (voltage > 3.7) return 60.0;
+      if (voltage > 3.5) return 40.0;
+      if (voltage > 3.3) return 20.0;
+      if (voltage > 3.0) return 10.0;
+      return 0.0;
+    unit_of_measurement: "%"
+    accuracy_decimals: 0
+    icon: "mdi:battery"
+    update_interval: 60s
+
+  # System sensors
+  - platform: wifi_signal
+    name: "WiFi Signal"
+    update_interval: 60s
+    icon: "mdi:wifi"
+    
+  - platform: uptime
+    name: "Uptime"
+    update_interval: 60s
+    icon: "mdi:clock-outline"
+
+# Binary sensors
+binary_sensor:
+  # Low battery warning
+  - platform: template
+    name: "Low Battery"
+    id: low_battery
+    lambda: |-
+      return id(battery_percentage).state < 20.0;
+    icon: "mdi:battery-low"
+    
+  # Soil moisture alerts
+  - platform: template
+    name: "Zone 1 Needs Water"
+    lambda: |-
+      return id(soil_moisture_1).state < 30.0;
+    icon: "mdi:water-alert"
+    
+  - platform: template
+    name: "Zone 2 Needs Water"
+    lambda: |-
+      return id(soil_moisture_2).state < 30.0;
+    icon: "mdi:water-alert"
+    
+  - platform: template
+    name: "Zone 3 Needs Water"
+    lambda: |-
+      return id(soil_moisture_3).state < 30.0;
+    icon: "mdi:water-alert"
+
+# Text sensors
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "IP Address"
+      icon: "mdi:ip-network"
+    ssid:
+      name: "Connected SSID"
+      icon: "mdi:wifi"
+    mac_address:
+      name: "MAC Address"
+      icon: "mdi:network"
+
+# Switches
+switch:
+  - platform: template
+    name: "Deep Sleep Mode"
+    id: deep_sleep_switch
+    icon: "mdi:sleep"
+    turn_on_action:
+      - deep_sleep.enter: deep_sleep_1
+    turn_off_action:
+      - deep_sleep.prevent: deep_sleep_1
+
+# Intervals for sensor readings
+interval:
+  - interval: 30s
+    then:
+      - logger.log: "Sensor readings complete"
+      
+  - interval: 5min
+    then:
+      - if:
+          condition:
+            lambda: 'return id(battery_percentage).state < 15.0;'
+          then:
+            - logger.log: "Critical battery level, entering deep sleep"
+            - deep_sleep.enter: deep_sleep_1
