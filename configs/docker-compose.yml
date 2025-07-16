@@ -58,7 +58,7 @@ services:
       - "8123:8123"
     privileged: true
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8123/manifest.json"]
+      test: ["CMD", "nc", "-z", "localhost", "8123"]
       interval: 30s
       timeout: 10s
       retries: 5
