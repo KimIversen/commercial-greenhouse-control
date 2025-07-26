@@ -1,0 +1,430 @@
+# Soil Moisture Sensor Calibration Configuration
+# For calibrating capacitive sensors in peat moss/wood fiber substrate
+
+substitutions:
+  device_name: "soil-calibration"
+  # Sensor pins - adjust based on your wiring
+  moisture_pin_1: "GPIO4"
+  moisture_pin_2: "GPIO5"
+  moisture_pin_3: "GPIO6"
+  moisture_pin_4: "GPIO7"
+
+esphome:
+  name: ${device_name}
+  friendly_name: Soil Moisture Calibration
+  comment: "Calibration tool for capacitive soil moisture sensors"
+  
+esp32:
+  board: esp32-c3-devkitm-1
+  framework:
+    type: arduino
+
+# Enhanced logging for calibration
+logger:
+  level: DEBUG
+  logs:
+    sensor: DEBUG
+    adc: DEBUG
+
+# API for real-time monitoring
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+# OTA for easy updates
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "Soil-Calibration-Fallback"
+    password: !secret fallback_password
+
+# Web server for easy monitoring without HA
+web_server:
+  port: 80
+
+# Time for logging
+time:
+  - platform: sntp
+    id: sntp_time
+    servers:
+      - pool.ntp.org
+
+# Global variables to store calibration values
+globals:
+  # Sensor 1 calibration points
+  - id: calib_0_vwc_1
+    type: float
+    restore_value: yes
+    initial_value: '2800'
+  - id: calib_30_vwc_1
+    type: float
+    restore_value: yes
+    initial_value: '2100'
+  - id: calib_45_vwc_1
+    type: float
+    restore_value: yes
+    initial_value: '1600'
+  - id: calib_60_vwc_1
+    type: float
+    restore_value: yes
+    initial_value: '1000'
+    
+  # Sensor 2-4 calibration points (similar structure)
+  - id: calib_0_vwc_2
+    type: float
+    restore_value: yes
+    initial_value: '2800'
+  - id: calib_30_vwc_2
+    type: float
+    restore_value: yes
+    initial_value: '2100'
+  - id: calib_45_vwc_2
+    type: float
+    restore_value: yes
+    initial_value: '1600'
+  - id: calib_60_vwc_2
+    type: float
+    restore_value: yes
+    initial_value: '1000'
+    
+  - id: calib_0_vwc_3
+    type: float
+    restore_value: yes
+    initial_value: '2800'
+  - id: calib_30_vwc_3
+    type: float
+    restore_value: yes
+    initial_value: '2100'
+  - id: calib_45_vwc_3
+    type: float
+    restore_value: yes
+    initial_value: '1600'
+  - id: calib_60_vwc_3
+    type: float
+    restore_value: yes
+    initial_value: '1000'
+    
+  - id: calib_0_vwc_4
+    type: float
+    restore_value: yes
+    initial_value: '2800'
+  - id: calib_30_vwc_4
+    type: float
+    restore_value: yes
+    initial_value: '2100'
+  - id: calib_45_vwc_4
+    type: float
+    restore_value: yes
+    initial_value: '1600'
+  - id: calib_60_vwc_4
+    type: float
+    restore_value: yes
+    initial_value: '1000'
+
+sensor:
+  # Raw ADC readings
+  - platform: adc
+    pin: ${moisture_pin_1}
+    name: "Sensor 1 Raw ADC"
+    id: moisture_raw_1
+    update_interval: 1s
+    attenuation: 11dB
+    filters:
+      - sliding_window_moving_average:
+          window_size: 10
+          send_every: 2
+    on_value:
+      then:
+        - logger.log:
+            format: "Sensor 1 Raw: %.0f"
+            args: ['id(moisture_raw_1).state']
+            
+  - platform: adc
+    pin: ${moisture_pin_2}
+    name: "Sensor 2 Raw ADC"
+    id: moisture_raw_2
+    update_interval: 1s
+    attenuation: 11dB
+    filters:
+      - sliding_window_moving_average:
+          window_size: 10
+          send_every: 2
+          
+  - platform: adc
+    pin: ${moisture_pin_3}
+    name: "Sensor 3 Raw ADC"
+    id: moisture_raw_3
+    update_interval: 1s
+    attenuation: 11dB
+    filters:
+      - sliding_window_moving_average:
+          window_size: 10
+          send_every: 2
+          
+  - platform: adc
+    pin: ${moisture_pin_4}
+    name: "Sensor 4 Raw ADC"
+    id: moisture_raw_4
+    update_interval: 1s
+    attenuation: 11dB
+    filters:
+      - sliding_window_moving_average:
+          window_size: 10
+          send_every: 2
+
+  # Calculated VWC percentages with polynomial interpolation
+  - platform: template
+    name: "Sensor 1 VWC %"
+    id: vwc_percent_1
+    lambda: |-
+      float raw = id(moisture_raw_1).state;
+      float x0 = id(calib_0_vwc_1);
+      float x25 = id(calib_25_vwc_1);
+      float x50 = id(calib_50_vwc_1);
+      float x75 = id(calib_75_vwc_1);
+      
+      // Linear interpolation between calibration points
+      if (raw >= x0) return 0.0;
+      if (raw <= x75) return 75.0;
+      
+      if (raw > x25) {
+        return 25.0 * (raw - x0) / (x25 - x0);
+      } else if (raw > x50) {
+        return 25.0 + 25.0 * (raw - x25) / (x50 - x25);
+      } else {
+        return 50.0 + 25.0 * (raw - x50) / (x75 - x50);
+      }
+    update_interval: 2s
+    unit_of_measurement: "% VWC"
+    accuracy_decimals: 1
+    device_class: moisture
+    
+  - platform: template
+    name: "Sensor 2 VWC %"
+    id: vwc_percent_2
+    lambda: |-
+      float raw = id(moisture_raw_2).state;
+      float x0 = id(calib_0_vwc_2);
+      float x25 = id(calib_25_vwc_2);
+      float x50 = id(calib_50_vwc_2);
+      float x75 = id(calib_75_vwc_2);
+      
+      if (raw >= x0) return 0.0;
+      if (raw <= x75) return 75.0;
+      
+      if (raw > x25) {
+        return 25.0 * (raw - x0) / (x25 - x0);
+      } else if (raw > x50) {
+        return 25.0 + 25.0 * (raw - x25) / (x50 - x25);
+      } else {
+        return 50.0 + 25.0 * (raw - x50) / (x75 - x50);
+      }
+    update_interval: 2s
+    unit_of_measurement: "% VWC"
+    accuracy_decimals: 1
+    device_class: moisture
+    
+  - platform: template
+    name: "Sensor 3 Moisture %"
+    id: moisture_percent_3
+    lambda: |-
+      float raw = id(moisture_raw_3).state;
+      float dry = id(calib_dry_3);
+      float wet = id(calib_wet_3);
+      float percent = 100.0 * (raw - dry) / (wet - dry);
+      if (percent < 0) percent = 0;
+      if (percent > 100) percent = 100;
+      return percent;
+    update_interval: 2s
+    unit_of_measurement: "%"
+    accuracy_decimals: 1
+    
+  - platform: template
+    name: "Sensor 4 Moisture %"
+    id: moisture_percent_4
+    lambda: |-
+      float raw = id(moisture_raw_4).state;
+      float dry = id(calib_dry_4);
+      float wet = id(calib_wet_4);
+      float percent = 100.0 * (raw - dry) / (wet - dry);
+      if (percent < 0) percent = 0;
+      if (percent > 100) percent = 100;
+      return percent;
+    update_interval: 2s
+    unit_of_measurement: "%"
+    accuracy_decimals: 1
+
+  # Statistics for stability monitoring
+  - platform: template
+    name: "Sensor 1 Std Dev"
+    lambda: |-
+      static std::vector<float> samples;
+      samples.push_back(id(moisture_raw_1).state);
+      if (samples.size() > 30) samples.erase(samples.begin());
+      
+      float sum = 0, mean = 0, variance = 0;
+      for (float val : samples) sum += val;
+      mean = sum / samples.size();
+      
+      for (float val : samples) {
+        variance += pow(val - mean, 2);
+      }
+      return sqrt(variance / samples.size());
+    update_interval: 5s
+    unit_of_measurement: "ADC"
+    accuracy_decimals: 1
+
+# Buttons for VWC calibration
+button:
+  # 0% VWC calibration (Oven-dry)
+  - platform: template
+    name: "Calibrate ALL - 0% VWC (Dry)"
+    on_press:
+      then:
+        - logger.log: "Setting 0% VWC calibration points..."
+        - globals.set:
+            id: calib_0_vwc_1
+            value: !lambda 'return id(moisture_raw_1).state;'
+        - globals.set:
+            id: calib_0_vwc_2
+            value: !lambda 'return id(moisture_raw_2).state;'
+        - globals.set:
+            id: calib_0_vwc_3
+            value: !lambda 'return id(moisture_raw_3).state;'
+        - globals.set:
+            id: calib_0_vwc_4
+            value: !lambda 'return id(moisture_raw_4).state;'
+        - logger.log:
+            format: "0%% VWC: S1=%.0f, S2=%.0f, S3=%.0f, S4=%.0f"
+            args: ['id(calib_0_vwc_1)', 'id(calib_0_vwc_2)', 'id(calib_0_vwc_3)', 'id(calib_0_vwc_4)']
+            
+  # 30% VWC calibration (Stress threshold)
+  - platform: template
+    name: "Calibrate ALL - 30% VWC (Stress)"
+    on_press:
+      then:
+        - logger.log: "Setting 30% VWC calibration points..."
+        - globals.set:
+            id: calib_30_vwc_1
+            value: !lambda 'return id(moisture_raw_1).state;'
+        - globals.set:
+            id: calib_30_vwc_2
+            value: !lambda 'return id(moisture_raw_2).state;'
+        - globals.set:
+            id: calib_30_vwc_3
+            value: !lambda 'return id(moisture_raw_3).state;'
+        - globals.set:
+            id: calib_30_vwc_4
+            value: !lambda 'return id(moisture_raw_4).state;'
+        - logger.log:
+            format: "30%% VWC: S1=%.0f, S2=%.0f, S3=%.0f, S4=%.0f"
+            args: ['id(calib_30_vwc_1)', 'id(calib_30_vwc_2)', 'id(calib_30_vwc_3)', 'id(calib_30_vwc_4)']
+
+  # 45% VWC calibration (Irrigation trigger)
+  - platform: template
+    name: "Calibrate ALL - 45% VWC (Trigger)"
+    on_press:
+      then:
+        - logger.log: "Setting 45% VWC calibration points..."
+        - globals.set:
+            id: calib_45_vwc_1
+            value: !lambda 'return id(moisture_raw_1).state;'
+        - globals.set:
+            id: calib_45_vwc_2
+            value: !lambda 'return id(moisture_raw_2).state;'
+        - globals.set:
+            id: calib_45_vwc_3
+            value: !lambda 'return id(moisture_raw_3).state;'
+        - globals.set:
+            id: calib_45_vwc_4
+            value: !lambda 'return id(moisture_raw_4).state;'
+        - logger.log:
+            format: "45%% VWC: S1=%.0f, S2=%.0f, S3=%.0f, S4=%.0f"
+            args: ['id(calib_45_vwc_1)', 'id(calib_45_vwc_2)', 'id(calib_45_vwc_3)', 'id(calib_45_vwc_4)']
+
+  # 60% VWC calibration (Container capacity)
+  - platform: template
+    name: "Calibrate ALL - 60% VWC (Capacity)"
+    on_press:
+      then:
+        - logger.log: "Setting 60% VWC calibration points..."
+        - globals.set:
+            id: calib_60_vwc_1
+            value: !lambda 'return id(moisture_raw_1).state;'
+        - globals.set:
+            id: calib_60_vwc_2
+            value: !lambda 'return id(moisture_raw_2).state;'
+        - globals.set:
+            id: calib_60_vwc_3
+            value: !lambda 'return id(moisture_raw_3).state;'
+        - globals.set:
+            id: calib_60_vwc_4
+            value: !lambda 'return id(moisture_raw_4).state;'
+        - logger.log:
+            format: "60%% VWC: S1=%.0f, S2=%.0f, S3=%.0f, S4=%.0f"
+            args: ['id(calib_60_vwc_1)', 'id(calib_60_vwc_2)', 'id(calib_60_vwc_3)', 'id(calib_60_vwc_4)']
+
+  # Reset calibration
+  - platform: template
+    name: "Reset Calibration"
+    on_press:
+      then:
+        - logger.log: "Resetting calibration to defaults..."
+        - globals.set:
+            id: calib_dry_1
+            value: '0'
+        - globals.set:
+            id: calib_wet_1
+            value: '4095'
+        - globals.set:
+            id: calib_dry_2
+            value: '0'
+        - globals.set:
+            id: calib_wet_2
+            value: '4095'
+        - globals.set:
+            id: calib_dry_3
+            value: '0'
+        - globals.set:
+            id: calib_wet_3
+            value: '4095'
+        - globals.set:
+            id: calib_dry_4
+            value: '0'
+        - globals.set:
+            id: calib_wet_4
+            value: '4095'
+
+  - platform: restart
+    name: "Restart Device"
+
+# Text sensors to display calibration values
+text_sensor:
+  - platform: template
+    name: "Calibration Values"
+    lambda: |-
+      char buffer[200];
+      snprintf(buffer, sizeof(buffer), 
+        "S1: %.0f-%.0f | S2: %.0f-%.0f | S3: %.0f-%.0f | S4: %.0f-%.0f",
+        id(calib_dry_1), id(calib_wet_1),
+        id(calib_dry_2), id(calib_wet_2),
+        id(calib_dry_3), id(calib_wet_3),
+        id(calib_dry_4), id(calib_wet_4));
+      return {buffer};
+    update_interval: 5s
+    
+  - platform: template
+    name: "Substrate Info"
+    lambda: |-
+      return {"Peat Moss/Wood Fiber 50/50"};
+
+# Status LED
+status_led:
+  pin:
+    number: GPIO8
+    inverted: true
