@@ -26,6 +26,73 @@ recorder:
 
 # MQTT (broker credentials now set via the UI integration)
 mqtt:
+  sensor:
+    # Device 1
+    - name: "Greenhouse Climate 1 Temperature"
+      state_topic: "greenhouse/climate1/temperature"
+      unit_of_measurement: "°C"
+      device_class: temperature
+      state_class: measurement
+      
+    - name: "Greenhouse Climate 1 Humidity"
+      state_topic: "greenhouse/climate1/humidity"
+      unit_of_measurement: "%"
+      device_class: humidity
+      state_class: measurement
+      
+    - name: "Greenhouse Climate 1 WiFi Signal"
+      state_topic: "greenhouse/climate1/wifi_signal"
+      unit_of_measurement: "dBm"
+      device_class: signal_strength
+      entity_category: diagnostic
+      
+    # Device 2 (when you add it)
+    - name: "Greenhouse Climate 2 Temperature"
+      state_topic: "greenhouse/climate2/temperature"
+      unit_of_measurement: "°C"
+      device_class: temperature
+      state_class: measurement
+      
+    - name: "Greenhouse Climate 2 Humidity"
+      state_topic: "greenhouse/climate2/humidity"
+      unit_of_measurement: "%"
+      device_class: humidity
+      state_class: measurement
+
+    - name: "Greenhouse Climate 2 WiFi Signal"
+      state_topic: "greenhouse/climate2/wifi_signal"
+      unit_of_measurement: "dBm"
+      device_class: signal_strength
+      entity_category: diagnostic
+
+  binary_sensor:
+    - name: "Greenhouse Climate 1 Status"
+      state_topic: "greenhouse/climate1/status"
+      payload_on: "online"
+      payload_off: "offline"
+      device_class: connectivity
+      
+    - name: "Greenhouse Climate 2 Status"
+      state_topic: "greenhouse/climate2/status"
+      payload_on: "online"
+      payload_off: "offline"
+      device_class: connectivity
+
+ switch:
+    - name: "Greenhouse Climate 1 OTA Mode"
+      state_topic: "greenhouse/climate1/ota_mode"
+      command_topic: "greenhouse/climate1/ota_mode/set"
+      payload_on: "ON"
+      payload_off: "OFF"
+      icon: mdi:upload-network
+
+    - name: "Greenhouse Climate 2 OTA Mode"
+      state_topic: "greenhouse/climate2/ota_mode"
+      command_topic: "greenhouse/climate2/ota_mode/set"
+      payload_on: "ON"
+      payload_off: "OFF"
+      icon: mdi:upload-network
+
 
 # Notifications
 notify:
