@@ -23,6 +23,7 @@ api:
 
 ota:
   - platform: esphome
+  - platform: web_server
     password: !secret ota_password
 
 wifi:
@@ -64,7 +65,7 @@ sensor:
     name: "S1 ADC (raw)"
     pin: ${s1_pin}
     raw: true
-    attenuation: 11dB
+    attenuation: 12db
     update_interval: 1s
     filters:
       - sliding_window_moving_average:
@@ -76,7 +77,7 @@ sensor:
     name: "S2 ADC (raw)"
     pin: ${s2_pin}
     raw: true
-    attenuation: 11dB
+    attenuation: 12db
     update_interval: 1s
     filters:
       - sliding_window_moving_average:
@@ -88,7 +89,7 @@ sensor:
     name: "S3 ADC (raw)"
     pin: ${s3_pin}
     raw: true
-    attenuation: 11dB
+    attenuation: 12db
     update_interval: 1s
     filters:
       - sliding_window_moving_average:
