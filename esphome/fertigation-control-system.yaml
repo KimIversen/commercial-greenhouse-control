@@ -1,0 +1,822 @@
+# Enterprise-Grade Fertigation Control System
+# ESP32S3 Controller for Commercial Greenhouse
+# With venturi ratio monitoring and 4-valve configuration
+
+substitutions:
+  device_name: "fertigation-controller"
+  # Tank sensor pins (JSN-SR04T ultrasonic)
+  fresh_water_trig: "GPIO4"
+  fresh_water_echo: "GPIO5"
+  fertilizer_a_trig: "GPIO6"
+  fertilizer_a_echo: "GPIO7"
+  fertilizer_b_trig: "GPIO8"
+  fertilizer_b_echo: "GPIO9"
+  mixed_tank_trig: "GPIO10"
+  mixed_tank_echo: "GPIO11"
+  
+  # Solenoid valve pins (4 valves)
+  valve_fresh_water: "GPIO12"      # Fresh water supply valve
+  valve_venturi_line: "GPIO13"     # Venturi line valve (A+B)
+  valve_mixed_tank: "GPIO14"       # Mixed tank valve
+  valve_irrigation: "GPIO15"       # Irrigation output valve
+  
+  # Tank dimensions (cm)
+  fresh_tank_height: "150"
+  fertilizer_tank_height: "100"
+  mixed_tank_height: "100"
+  
+  # Operational parameters
+  target_ratio_a: "1.0"      # A:Water ratio (1:100)
+  target_ratio_b: "1.0"      # B:Water ratio (1:100)
+  ratio_tolerance: "20"      # 20% deviation allowed
+  mixing_flow_rate: "25"     # L/min expected during mixing
+  irrigation_flow_rate: "7"  # L/min expected during irrigation
+
+esphome:
+  name: ${device_name}
+  friendly_name: Fertigation Controller
+  comment: "Commercial greenhouse fertigation system with ratio monitoring"
+  on_boot:
+    priority: -100
+    then:
+      - script.execute: system_startup_check
+  
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: arduino
+
+# Enhanced logging for production
+logger:
+  level: INFO
+  logs:
+    sensor: WARN
+    ultrasonic: INFO
+
+# API with encryption
+api:
+  encryption:
+    key: !secret api_encryption_key
+  services:
+    # Manual control services
+    - service: start_irrigation
+      then:
+        - script.execute: manual_irrigation_cycle
+    - service: stop_all_valves
+      then:
+        - script.execute: emergency_stop
+    - service: refill_mixed_tank
+      then:
+        - script.execute: check_and_refill_mixed_tank
+
+# OTA updates
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+# Network configuration
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  manual_ip:
+    static_ip: 192.168.10.200
+    gateway: 192.168.10.1
+    subnet: 255.255.255.0
+  
+  # Fallback hotspot
+  ap:
+    ssid: "Fertigation-Fallback"
+    password: !secret fallback_password
+
+# MQTT for data logging and remote monitoring
+mqtt:
+  broker: !secret mqtt_broker
+  username: !secret mqtt_username
+  password: !secret mqtt_password
+  topic_prefix: greenhouse/fertigation
+  birth_message:
+    topic: greenhouse/fertigation/status
+    payload: online
+  will_message:
+    topic: greenhouse/fertigation/status
+    payload: offline
+
+# Time component for scheduling
+time:
+  - platform: sntp
+    id: sntp_time
+    timezone: "Europe/Oslo"
+    servers:
+      - pool.ntp.org
+    on_time:
+      # Check irrigation need every 30 minutes during daylight
+      - seconds: 0
+        minutes: /30
+        then:
+          - script.execute: check_irrigation_schedule
+
+# Global variables for system state and monitoring
+globals:
+  - id: irrigation_active
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+    
+  - id: mixing_active
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+    
+  - id: ratio_monitoring_active
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+    
+  - id: ratio_deviation_start
+    type: int
+    restore_value: no
+    initial_value: '0'
+    
+  - id: mixing_start_time
+    type: int
+    restore_value: no
+    initial_value: '0'
+    
+  # Tank level history for flow calculation
+  - id: fresh_water_history
+    type: std::vector<float>
+    restore_value: no
+    
+  - id: fertilizer_a_history
+    type: std::vector<float>
+    restore_value: no
+    
+  - id: fertilizer_b_history
+    type: std::vector<float>
+    restore_value: no
+    
+  # Consumption tracking
+  - id: last_mix_water_used
+    type: float
+    restore_value: yes
+    initial_value: '0'
+    
+  - id: last_mix_a_used
+    type: float
+    restore_value: yes
+    initial_value: '0'
+    
+  - id: last_mix_b_used
+    type: float
+    restore_value: yes
+    initial_value: '0'
+
+# Tank level sensors with noise filtering
+sensor:
+  # Fresh water tank (1000L)
+  - platform: ultrasonic
+    trigger_pin: ${fresh_water_trig}
+    echo_pin: ${fresh_water_echo}
+    name: "Fresh Water Level Raw"
+    id: fresh_water_level_raw
+    update_interval: 3s
+    filters:
+      - median:
+          window_size: 3
+          send_every: 1
+      - sliding_window_moving_average:
+          window_size: 3
+          send_every: 1
+    internal: true
+    
+  - platform: template
+    name: "Fresh Water Tank %"
+    id: fresh_water_percent
+    lambda: |-
+      float height = ${fresh_tank_height};
+      float distance = id(fresh_water_level_raw).state * 100;  // Convert to cm
+      if (distance > height || distance < 0) return id(fresh_water_percent).state;
+      float level = height - distance;
+      float percent = (level / height) * 100;
+      if (percent < 0) percent = 0;
+      if (percent > 100) percent = 100;
+      return percent;
+    update_interval: 10s
+    unit_of_measurement: "%"
+    accuracy_decimals: 1
+    filters:
+      - lambda: |-
+          // Reject impossible changes (>5% in 10s = >50L = impossible)
+          static float last_value = x;
+          if (fabs(x - last_value) > 5.0) {
+            return last_value;
+          }
+          last_value = x;
+          return x;
+    
+  # Fresh water volume in liters
+  - platform: template
+    name: "Fresh Water Volume"
+    id: fresh_water_volume
+    lambda: |-
+      return id(fresh_water_percent).state * 10.0;  // 1000L tank
+    update_interval: 10s
+    unit_of_measurement: "L"
+    accuracy_decimals: 1
+    
+  # Fertilizer A tank (200L)
+  - platform: ultrasonic
+    trigger_pin: ${fertilizer_a_trig}
+    echo_pin: ${fertilizer_a_echo}
+    name: "Fertilizer A Level Raw"
+    id: fertilizer_a_level_raw
+    update_interval: 3s
+    filters:
+      - median:
+          window_size: 3
+      - sliding_window_moving_average:
+          window_size: 3
+    internal: true
+    
+  - platform: template
+    name: "Fertilizer A Tank %"
+    id: fertilizer_a_percent
+    lambda: |-
+      float height = ${fertilizer_tank_height};
+      float distance = id(fertilizer_a_level_raw).state * 100;
+      if (distance > height || distance < 0) return id(fertilizer_a_percent).state;
+      float level = height - distance;
+      float percent = (level / height) * 100;
+      if (percent < 0) percent = 0;
+      if (percent > 100) percent = 100;
+      return percent;
+    update_interval: 10s
+    unit_of_measurement: "%"
+    accuracy_decimals: 1
+    filters:
+      - lambda: |-
+          static float last_value = x;
+          if (fabs(x - last_value) > 5.0) return last_value;
+          last_value = x;
+          return x;
+          
+  - platform: template
+    name: "Fertilizer A Volume"
+    id: fertilizer_a_volume
+    lambda: |-
+      return id(fertilizer_a_percent).state * 2.0;  // 200L tank
+    update_interval: 10s
+    unit_of_measurement: "L"
+    accuracy_decimals: 1
+    
+  # Fertilizer B tank (200L)
+  - platform: ultrasonic
+    trigger_pin: ${fertilizer_b_trig}
+    echo_pin: ${fertilizer_b_echo}
+    name: "Fertilizer B Level Raw"
+    id: fertilizer_b_level_raw
+    update_interval: 3s
+    filters:
+      - median:
+          window_size: 3
+      - sliding_window_moving_average:
+          window_size: 3
+    internal: true
+    
+  - platform: template
+    name: "Fertilizer B Tank %"
+    id: fertilizer_b_percent
+    lambda: |-
+      float height = ${fertilizer_tank_height};
+      float distance = id(fertilizer_b_level_raw).state * 100;
+      if (distance > height || distance < 0) return id(fertilizer_b_percent).state;
+      float level = height - distance;
+      float percent = (level / height) * 100;
+      if (percent < 0) percent = 0;
+      if (percent > 100) percent = 100;
+      return percent;
+    update_interval: 10s
+    unit_of_measurement: "%"
+    accuracy_decimals: 1
+    filters:
+      - lambda: |-
+          static float last_value = x;
+          if (fabs(x - last_value) > 5.0) return last_value;
+          last_value = x;
+          return x;
+          
+  - platform: template
+    name: "Fertilizer B Volume"
+    id: fertilizer_b_volume
+    lambda: |-
+      return id(fertilizer_b_percent).state * 2.0;  // 200L tank
+    update_interval: 10s
+    unit_of_measurement: "L"
+    accuracy_decimals: 1
+    
+  # Mixed solution tank (200L)
+  - platform: ultrasonic
+    trigger_pin: ${mixed_tank_trig}
+    echo_pin: ${mixed_tank_echo}
+    name: "Mixed Tank Level Raw"
+    id: mixed_tank_level_raw
+    update_interval: 3s
+    filters:
+      - median:
+          window_size: 3
+      - sliding_window_moving_average:
+          window_size: 3
+    internal: true
+    
+  - platform: template
+    name: "Mixed Tank %"
+    id: mixed_tank_percent
+    lambda: |-
+      float height = ${mixed_tank_height};
+      float distance = id(mixed_tank_level_raw).state * 100;
+      if (distance > height || distance < 0) return id(mixed_tank_percent).state;
+      float level = height - distance;
+      float percent = (level / height) * 100;
+      if (percent < 0) percent = 0;
+      if (percent > 100) percent = 100;
+      return percent;
+    update_interval: 10s
+    unit_of_measurement: "%"
+    accuracy_decimals: 1
+    filters:
+      - lambda: |-
+          static float last_value = x;
+          if (fabs(x - last_value) > 5.0) return last_value;
+          last_value = x;
+          return x;
+    on_value:
+      below: 10
+      then:
+        - switch.turn_off: valve_irrigation
+        - logger.log: "Mixed tank critically low - stopping irrigation"
+        
+  # Flow rate calculations
+  - platform: template
+    name: "Water Flow Rate"
+    id: water_flow_rate
+    lambda: |-
+      if (!id(mixing_active)) return 0.0;
+      if (id(fresh_water_history).size() < 5) return 0.0;
+      
+      float oldest = id(fresh_water_history)[0];
+      float newest = id(fresh_water_history).back();
+      float liters_consumed = (oldest - newest) * 10.0;  // Convert % to L
+      float minutes = id(fresh_water_history).size() * 10.0 / 60.0;  // 10s intervals
+      
+      return liters_consumed / minutes;
+    update_interval: 10s
+    unit_of_measurement: "L/min"
+    accuracy_decimals: 1
+    
+  - platform: template
+    name: "Fertilizer A Flow Rate"
+    id: fertilizer_a_flow_rate
+    lambda: |-
+      if (!id(mixing_active)) return 0.0;
+      if (id(fertilizer_a_history).size() < 5) return 0.0;
+      
+      float oldest = id(fertilizer_a_history)[0];
+      float newest = id(fertilizer_a_history).back();
+      float liters_consumed = (oldest - newest) * 2.0;  // Convert % to L
+      float minutes = id(fertilizer_a_history).size() * 10.0 / 60.0;
+      
+      return liters_consumed / minutes;
+    update_interval: 10s
+    unit_of_measurement: "L/min"
+    accuracy_decimals: 3
+    
+  - platform: template
+    name: "Fertilizer B Flow Rate"
+    id: fertilizer_b_flow_rate
+    lambda: |-
+      if (!id(mixing_active)) return 0.0;
+      if (id(fertilizer_b_history).size() < 5) return 0.0;
+      
+      float oldest = id(fertilizer_b_history)[0];
+      float newest = id(fertilizer_b_history).back();
+      float liters_consumed = (oldest - newest) * 2.0;  // Convert % to L
+      float minutes = id(fertilizer_b_history).size() * 10.0 / 60.0;
+      
+      return liters_consumed / minutes;
+    update_interval: 10s
+    unit_of_measurement: "L/min"
+    accuracy_decimals: 3
+    
+  # Ratio monitoring
+  - platform: template
+    name: "Fertilizer A Ratio Deviation"
+    id: ratio_deviation_a
+    lambda: |-
+      if (!id(ratio_monitoring_active)) return 0.0;
+      if (id(water_flow_rate).state < 5.0) return 0.0;  // Min flow to calculate
+      
+      float expected_a = id(water_flow_rate).state * ${target_ratio_a} / 100.0;
+      float actual_a = id(fertilizer_a_flow_rate).state;
+      
+      if (expected_a > 0) {
+        return ((actual_a - expected_a) / expected_a) * 100.0;
+      }
+      return 0.0;
+    update_interval: 10s
+    unit_of_measurement: "%"
+    accuracy_decimals: 1
+    
+  - platform: template
+    name: "Fertilizer B Ratio Deviation"
+    id: ratio_deviation_b
+    lambda: |-
+      if (!id(ratio_monitoring_active)) return 0.0;
+      if (id(water_flow_rate).state < 5.0) return 0.0;
+      
+      float expected_b = id(water_flow_rate).state * ${target_ratio_b} / 100.0;
+      float actual_b = id(fertilizer_b_flow_rate).state;
+      
+      if (expected_b > 0) {
+        return ((actual_b - expected_b) / expected_b) * 100.0;
+      }
+      return 0.0;
+    update_interval: 10s
+    unit_of_measurement: "%"
+    accuracy_decimals: 1
+    
+  # System monitoring
+  - platform: wifi_signal
+    name: "WiFi Signal"
+    update_interval: 60s
+    
+  - platform: uptime
+    name: "System Uptime"
+    
+  # Import VWC from soil moisture sensors
+  - platform: homeassistant
+    name: "Average Soil VWC"
+    entity_id: sensor.greenhouse_soil_vwc_average
+    id: soil_vwc
+    
+  # Import sunrise/sunset times
+  - platform: homeassistant
+    name: "Hours After Sunrise"
+    entity_id: sensor.hours_after_sunrise
+    id: hours_after_sunrise
+    
+  - platform: homeassistant
+    name: "Hours Until Sunset"
+    entity_id: sensor.hours_until_sunset
+    id: hours_until_sunset
+
+# Solenoid valve controls (4 valves)
+switch:
+  - platform: gpio
+    pin: ${valve_fresh_water}
+    name: "Valve - Fresh Water"
+    id: valve_fresh_water
+    icon: mdi:valve
+    restore_mode: ALWAYS_OFF
+    
+  - platform: gpio
+    pin: ${valve_venturi_line}
+    name: "Valve - Venturi Line"
+    id: valve_venturi_line
+    icon: mdi:valve
+    restore_mode: ALWAYS_OFF
+    
+  - platform: gpio
+    pin: ${valve_mixed_tank}
+    name: "Valve - Mixed Tank"
+    id: valve_mixed_tank
+    icon: mdi:valve
+    restore_mode: ALWAYS_OFF
+    
+  - platform: gpio
+    pin: ${valve_irrigation}
+    name: "Valve - Irrigation"
+    id: valve_irrigation
+    icon: mdi:water
+    restore_mode: ALWAYS_OFF
+    on_turn_on:
+      then:
+        - globals.set:
+            id: irrigation_active
+            value: 'true'
+    on_turn_off:
+      then:
+        - globals.set:
+            id: irrigation_active
+            value: 'false'
+
+# Status indicators
+binary_sensor:
+  - platform: template
+    name: "System Ready"
+    lambda: |-
+      return id(fresh_water_percent).state > 20 &&
+             id(fertilizer_a_percent).state > 20 &&
+             id(fertilizer_b_percent).state > 20;
+    device_class: problem
+    
+  - platform: template
+    name: "Low Water Alert"
+    lambda: |-
+      return id(fresh_water_percent).state < 20;
+    device_class: problem
+    
+  - platform: template
+    name: "Low Fertilizer Alert"
+    lambda: |-
+      return id(fertilizer_a_percent).state < 20 ||
+             id(fertilizer_b_percent).state < 20;
+    device_class: problem
+    
+  - platform: template
+    name: "Ratio Deviation Alert"
+    id: ratio_alert
+    lambda: |-
+      return (fabs(id(ratio_deviation_a).state) > ${ratio_tolerance}) ||
+             (fabs(id(ratio_deviation_b).state) > ${ratio_tolerance});
+    device_class: problem
+
+# Control scripts
+script:
+  # System startup check
+  - id: system_startup_check
+    then:
+      - logger.log: "System startup - checking all valves closed"
+      - switch.turn_off: valve_fresh_water
+      - switch.turn_off: valve_venturi_line
+      - switch.turn_off: valve_mixed_tank
+      - switch.turn_off: valve_irrigation
+      - delay: 2s
+      - logger.log: "System ready"
+      
+  # Emergency stop
+  - id: emergency_stop
+    then:
+      - logger.log: "EMERGENCY STOP - Closing all valves"
+      - switch.turn_off: valve_fresh_water
+      - switch.turn_off: valve_venturi_line
+      - switch.turn_off: valve_mixed_tank
+      - switch.turn_off: valve_irrigation
+      - globals.set:
+          id: irrigation_active
+          value: 'false'
+      - globals.set:
+          id: mixing_active
+          value: 'false'
+      - globals.set:
+          id: ratio_monitoring_active
+          value: 'false'
+          
+  # Check irrigation schedule
+  - id: check_irrigation_schedule
+    then:
+      - if:
+          condition:
+            # Between 1hr after sunrise and 2hr before sunset
+            and:
+              - lambda: 'return id(hours_after_sunrise).state > 1;'
+              - lambda: 'return id(hours_until_sunset).state > 2;'
+              - lambda: 'return !id(irrigation_active);'
+              - lambda: 'return !id(mixing_active);'
+          then:
+            - script.execute: check_irrigation_need
+            
+  # Check if irrigation is needed
+  - id: check_irrigation_need
+    then:
+      - if:
+          condition:
+            # Check if VWC is below trigger (45%)
+            lambda: 'return id(soil_vwc).state < 45;'
+          then:
+            - logger.log: "Soil moisture below trigger - checking tank levels"
+            - script.execute: check_tank_levels_and_irrigate
+            
+  # Check tank levels and start irrigation
+  - id: check_tank_levels_and_irrigate
+    then:
+      - if:
+          condition:
+            # Check if mixed tank has enough water (>50%)
+            lambda: 'return id(mixed_tank_percent).state > 50;'
+          then:
+            - logger.log: "Mixed tank sufficient - starting irrigation"
+            - script.execute: irrigation_cycle
+          else:
+            - logger.log: "Mixed tank low - checking if can refill"
+            - script.execute: check_and_refill_mixed_tank
+            
+  # Refill mixed tank cycle
+  - id: check_and_refill_mixed_tank
+    then:
+      - if:
+          condition:
+            # Check if all source tanks have enough
+            and:
+              - lambda: 'return id(fresh_water_percent).state > 20;'
+              - lambda: 'return id(fertilizer_a_percent).state > 20;'
+              - lambda: 'return id(fertilizer_b_percent).state > 20;'
+          then:
+            - logger.log: "Source tanks OK - refilling mixed tank"
+            - script.execute: refill_mixed_tank_with_monitoring
+          else:
+            - logger.log: "ERROR: Insufficient water/fertilizer levels"
+            - homeassistant.service:
+                service: notify.email_admin
+                data:
+                  title: "Fertigation Alert - Low Tank Levels"
+                  message: !lambda |-
+                    char buffer[300];
+                    sprintf(buffer, "Tank levels critically low:\nFresh water: %.1f%%\nFertilizer A: %.1f%%\nFertilizer B: %.1f%%\nMixed tank: %.1f%%",
+                            id(fresh_water_percent).state,
+                            id(fertilizer_a_percent).state,
+                            id(fertilizer_b_percent).state,
+                            id(mixed_tank_percent).state);
+                    return std::string(buffer);
+                    
+  # Refill mixed tank with ratio monitoring
+  - id: refill_mixed_tank_with_monitoring
+    then:
+      - globals.set:
+          id: mixing_active
+          value: 'true'
+      - globals.set:
+          id: mixing_start_time
+          value: !lambda 'return millis();'
+      - logger.log: "Starting mixed tank refill with ratio monitoring"
+      
+      # Clear history buffers
+      - lambda: |-
+          id(fresh_water_history).clear();
+          id(fertilizer_a_history).clear();
+          id(fertilizer_b_history).clear();
+          
+      # Open valves for mixing
+      - switch.turn_on: valve_fresh_water
+      - switch.turn_on: valve_venturi_line
+      - switch.turn_off: valve_mixed_tank
+      - switch.turn_off: valve_irrigation
+      
+      # Wait for flow stabilization
+      - delay: 60s
+      - logger.log: "Flow stabilized - starting ratio monitoring"
+      - globals.set:
+          id: ratio_monitoring_active
+          value: 'true'
+          
+      # Start monitoring loop
+      - script.execute: monitor_mixing_ratios
+      
+  # Monitor mixing ratios
+  - id: monitor_mixing_ratios
+    mode: restart
+    then:
+      - lambda: |-
+          // Store current levels in history
+          id(fresh_water_history).push_back(id(fresh_water_percent).state);
+          id(fertilizer_a_history).push_back(id(fertilizer_a_percent).state);
+          id(fertilizer_b_history).push_back(id(fertilizer_b_percent).state);
+          
+          // Keep only last 5 readings (50 seconds)
+          if (id(fresh_water_history).size() > 5) {
+            id(fresh_water_history).erase(id(fresh_water_history).begin());
+            id(fertilizer_a_history).erase(id(fertilizer_a_history).begin());
+            id(fertilizer_b_history).erase(id(fertilizer_b_history).begin());
+          }
+          
+      - delay: 10s
+      
+      # Check for ratio deviations
+      - if:
+          condition:
+            and:
+              - lambda: 'return id(ratio_monitoring_active);'
+              - binary_sensor.is_on: ratio_alert
+          then:
+            - if:
+                condition:
+                  lambda: |-
+                    // Check if deviation has been sustained for 2 minutes
+                    if (id(ratio_deviation_start) == 0) {
+                      id(ratio_deviation_start) = millis();
+                    }
+                    return (millis() - id(ratio_deviation_start)) > 120000;  // 2 minutes
+                then:
+                  - logger.log: "Ratio deviation sustained for 2 minutes - stopping mixing"
+                  - script.execute: handle_ratio_deviation
+                else:
+                  - script.execute: monitor_mixing_ratios
+          else:
+            - globals.set:
+                id: ratio_deviation_start
+                value: '0'
+            - if:
+                condition:
+                  # Check if mixed tank is full or fertilizer empty
+                  or:
+                    - lambda: 'return id(mixed_tank_percent).state > 90;'
+                    - lambda: 'return id(fertilizer_a_percent).state < 5;'
+                    - lambda: 'return id(fertilizer_b_percent).state < 5;'
+                then:
+                  - script.execute: finish_mixing
+                else:
+                  - script.execute: monitor_mixing_ratios
+                  
+  # Handle ratio deviation
+  - id: handle_ratio_deviation
+    then:
+      - logger.log: "Handling ratio deviation - closing valves"
+      - switch.turn_off: valve_fresh_water
+      - switch.turn_off: valve_venturi_line
+      - globals.set:
+          id: mixing_active
+          value: 'false'
+      - globals.set:
+          id: ratio_monitoring_active
+          value: 'false'
+          
+      # Calculate consumption
+      - lambda: |-
+          float water_start = id(fresh_water_history)[0];
+          float water_end = id(fresh_water_percent).state;
+          id(last_mix_water_used) = (water_start - water_end) * 10.0;
+          
+          float a_start = id(fertilizer_a_history)[0];
+          float a_end = id(fertilizer_a_percent).state;
+          id(last_mix_a_used) = (a_start - a_end) * 2.0;
+          
+          float b_start = id(fertilizer_b_history)[0];
+          float b_end = id(fertilizer_b_percent).state;
+          id(last_mix_b_used) = (b_start - b_end) * 2.0;
+          
+      - homeassistant.service:
+          service: notify.email_admin
+          data:
+            title: "Fertigation Alert - Ratio Deviation"
+            message: !lambda |-
+              char buffer[400];
+              sprintf(buffer, "Mixing stopped due to ratio deviation:\nA deviation: %.1f%%\nB deviation: %.1f%%\n\nConsumption:\nWater: %.1fL\nFert A: %.2fL (expected %.2fL)\nFert B: %.2fL (expected %.2fL)\n\nMixed tank: %.1f%%",
+                      id(ratio_deviation_a).state,
+                      id(ratio_deviation_b).state,
+                      id(last_mix_water_used),
+                      id(last_mix_a_used), id(last_mix_water_used) * 0.01,
+                      id(last_mix_b_used), id(last_mix_water_used) * 0.01,
+                      id(mixed_tank_percent).state);
+              return std::string(buffer);
+              
+      # Check if we can still irrigate
+      - if:
+          condition:
+            lambda: 'return id(mixed_tank_percent).state > 20;'
+          then:
+            - if:
+                condition:
+                  lambda: 'return id(soil_vwc).state < 45;'
+                then:
+                  - logger.log: "Mixed tank >20% - proceeding with irrigation"
+                  - script.execute: irrigation_cycle
+                  
+  # Finish mixing successfully
+  - id: finish_mixing
+    then:
+      - logger.log: "Mixing complete - closing valves"
+      - switch.turn_off: valve_fresh_water
+      - switch.turn_off: valve_venturi_line
+      - globals.set:
+          id: mixing_active
+          value: 'false'
+      - globals.set:
+          id: ratio_monitoring_active
+          value: 'false'
+          
+      # Calculate final consumption
+      - lambda: |-
+          float water_start = id(fresh_water_history)[0];
+          float water_end = id(fresh_water_percent).state;
+          id(last_mix_water_used) = (water_start - water_end) * 10.0;
+          
+          float a_start = id(fertilizer_a_history)[0];
+          float a_end = id(fertilizer_a_percent).state;
+          id(last_mix_a_used) = (a_start - a_end) * 2.0;
+          
+          float b_start = id(fertilizer_b_history)[0];
+          float b_end = id(fertilizer_b_percent).state;
+          id(last_mix_b_used) = (b_start - b_end) * 2.0;
+          
+      - delay: 30s  # Allow mixing
+      
+      # Publish mixing results
+      - mqtt.publish:
+          topic: greenhouse/fertigation/mixing_complete
+          payload: !lambda |-
+            char buffer[200];
+            sprintf(buffer, "{\"water\":%.1f,\"fert_a\":%.2f,\"fert_b\":%.2f,\"duration\":%d}",
+                    id(last_mix_water_used),
+                    id(last_mix_a_used),
+                    id(last_mix_b_used),
+                    (millis() - id(mixing_start_time)) / 1000);
+            return std::string(buffer);
