@@ -1,268 +1,409 @@
-esphome:
-  name: soil-sensor-node-1  # Change to -2, -3, etc. for additional nodes
-  friendly_name: "Soil Sensor Node 1"
+# Soil Moisture Monitoring System
+# For commercial tomato greenhouse with calibrated sensors
 
+substitutions:
+  device_number: "1"
+  device_ip: "192.168.10.151"
+  
+  # Sensor GPIO pins
+  moisture_pin_1: "GPIO4"
+  moisture_pin_2: "GPIO5"
+  moisture_pin_3: "GPIO6"
+  
+  # Optional 4th sensor
+  moisture_pin_4: "GPIO7"
+  
+  # Update interval
+  update_interval: "30s"
+
+esphome:
+  name: greenhouse-soil-${device_number}
+  friendly_name: Greenhouse Soil Monitor ${device_number}
+  comment: "Soil moisture monitoring with calibrated capacitive sensors"
+  
 esp32:
-  board: seeed_xiao_esp32c3
+  board: esp32-c3-devkitm-1
   framework:
     type: arduino
 
-# Enable logging (reduce level for battery savings)
+# Logging
 logger:
-  level: WARN
+  level: INFO
+  logs:
+    sensor: INFO
+    adc: WARN
 
-# Enable Home Assistant API
+# API for Home Assistant
 api:
   encryption:
-    key: "your-32-character-api-key-here"
+    key: !secret api_encryption_key
 
+# OTA updates
 ota:
-  password: "your-ota-password-here"
+  - platform: esphome
+    password: !secret ota_password
 
+# WiFi configuration
 wifi:
-  ssid: "Your-WiFi-SSID"
-  password: "Your-WiFi-Password"
-  
-  # Fast connect to save power
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
   fast_connect: true
   
-  # Power save mode
-  power_save_mode: LIGHT
-
-  # Enable fallback hotspot
+  manual_ip:
+    static_ip: ${device_ip}
+    gateway: 192.168.10.1
+    subnet: 255.255.255.0
+    dns1: 192.168.10.1
+  
   ap:
-    ssid: "Soil-Node-1 Fallback"
-    password: "fallback-password"
+    ssid: "Soil-Monitor-${device_number}"
+    password: !secret fallback_password
 
-captive_portal:
+# MQTT for data logging
+mqtt:
+  broker: !secret mqtt_broker
+  username: !secret mqtt_username
+  password: !secret mqtt_password
+  port: 1883
+  topic_prefix: greenhouse/soil${device_number}
+  birth_message:
+    topic: greenhouse/soil${device_number}/status
+    payload: online
+    retain: true
+  will_message:
+    topic: greenhouse/soil${device_number}/status
+    payload: offline
+    retain: true
 
-# Time component for smart scheduling
+# Time component
 time:
-  - platform: homeassistant
-    id: homeassistant_time
+  - platform: sntp
+    id: sntp_time
     timezone: "Europe/Oslo"
 
-# Global variables for scheduling
-globals:
-  - id: next_sleep_duration
-    type: int
-    initial_value: '7200'  # Default 2 hours
+# Web server for local monitoring
+web_server:
+  port: 80
 
-# Deep sleep with dynamic duration
-deep_sleep:
-  id: deep_sleep_control
-  run_duration: 60s  # Stay awake for 60 seconds
-  sleep_duration: 7200s  # Will be overridden by smart scheduling
-
-# Dallas temperature sensor setup (1-wire bus)
-dallas:
-  - pin: GPIO3
-    update_interval: 10s
-
-# Sensors
 sensor:
-  # Battery voltage monitoring (via voltage divider)
+  # Sensor 1 - Raw ADC reading
   - platform: adc
-    pin: A3
-    name: "Battery Voltage"
-    id: battery_voltage
-    update_interval: 10s
-    accuracy_decimals: 2
+    pin: ${moisture_pin_1}
+    name: "Sensor 1 Raw ADC"
+    id: moisture_raw_1
+    attenuation: 11dB
+    update_interval: ${update_interval}
     filters:
-      - multiply: 2.0  # Adjust based on your voltage divider
-    unit_of_measurement: "V"
-    icon: "mdi:battery"
-
-  # Battery percentage (calculated from voltage)
+      - sliding_window_moving_average:
+          window_size: 5
+          send_every: 1
+    internal: true
+    
+  # Sensor 1 - VWC with your calibration data
   - platform: template
-    name: "Battery Percentage"
+    name: "Soil VWC Sensor 1"
+    id: soil_vwc_1
     lambda: |-
-      float voltage = id(battery_voltage).state;
-      if (voltage < 6.0) return 0.0;      // 3.0V per cell (empty)
-      if (voltage > 8.4) return 100.0;    // 4.2V per cell (full)
-      return (voltage - 6.0) / 2.4 * 100.0;
-    update_interval: 10s
-    unit_of_measurement: "%"
-    icon: "mdi:battery-outline"
-
-  # WiFi Signal Strength
+      float raw = id(moisture_raw_1).state * 4095;  // Convert to raw ADC value
+      
+      // Calibration points for Sensor 1
+      // VWC: 0%, 30%, 45%, 51%
+      // ADC: 3596, 2678, 2539, 2205
+      
+      // Piecewise linear interpolation
+      if (raw >= 3596) {
+        return 0.0;  // Dry
+      } else if (raw >= 2678) {
+        // 0-30% range
+        return 30.0 * (3596 - raw) / (3596 - 2678);
+      } else if (raw >= 2539) {
+        // 30-45% range
+        return 30.0 + 15.0 * (2678 - raw) / (2678 - 2539);
+      } else if (raw >= 2205) {
+        // 45-51% range
+        return 45.0 + 6.0 * (2539 - raw) / (2539 - 2205);
+      } else {
+        // Above 51% - extrapolate carefully
+        float slope = 6.0 / (2539 - 2205);  // VWC change per ADC unit
+        float vwc = 51.0 + slope * (2205 - raw);
+        if (vwc > 75.0) vwc = 75.0;  // Cap at 75% VWC
+        return vwc;
+      }
+    update_interval: ${update_interval}
+    unit_of_measurement: "% VWC"
+    accuracy_decimals: 1
+    device_class: moisture
+    filters:
+      - sliding_window_moving_average:
+          window_size: 3
+          send_every: 1
+    on_value:
+      then:
+        - mqtt.publish:
+            topic: greenhouse/soil${device_number}/sensor1_vwc
+            payload: !lambda 'return to_string(x);'
+            retain: true
+            
+  # Sensor 2 - Raw ADC reading
+  - platform: adc
+    pin: ${moisture_pin_2}
+    name: "Sensor 2 Raw ADC"
+    id: moisture_raw_2
+    attenuation: 11dB
+    update_interval: ${update_interval}
+    filters:
+      - sliding_window_moving_average:
+          window_size: 5
+          send_every: 1
+    internal: true
+    
+  # Sensor 2 - VWC with your calibration data
+  - platform: template
+    name: "Soil VWC Sensor 2"
+    id: soil_vwc_2
+    lambda: |-
+      float raw = id(moisture_raw_2).state * 4095;
+      
+      // Calibration points for Sensor 2
+      // VWC: 0%, 30%, 45%, 51%
+      // ADC: 3338, 1782, 1491, 1339
+      
+      if (raw >= 3338) {
+        return 0.0;
+      } else if (raw >= 1782) {
+        // 0-30% range
+        return 30.0 * (3338 - raw) / (3338 - 1782);
+      } else if (raw >= 1491) {
+        // 30-45% range
+        return 30.0 + 15.0 * (1782 - raw) / (1782 - 1491);
+      } else if (raw >= 1339) {
+        // 45-51% range
+        return 45.0 + 6.0 * (1491 - raw) / (1491 - 1339);
+      } else {
+        float slope = 6.0 / (1491 - 1339);
+        float vwc = 51.0 + slope * (1339 - raw);
+        if (vwc > 75.0) vwc = 75.0;
+        return vwc;
+      }
+    update_interval: ${update_interval}
+    unit_of_measurement: "% VWC"
+    accuracy_decimals: 1
+    device_class: moisture
+    filters:
+      - sliding_window_moving_average:
+          window_size: 3
+          send_every: 1
+    on_value:
+      then:
+        - mqtt.publish:
+            topic: greenhouse/soil${device_number}/sensor2_vwc
+            payload: !lambda 'return to_string(x);'
+            retain: true
+            
+  # Sensor 3 - Raw ADC reading
+  - platform: adc
+    pin: ${moisture_pin_3}
+    name: "Sensor 3 Raw ADC"
+    id: moisture_raw_3
+    attenuation: 11dB
+    update_interval: ${update_interval}
+    filters:
+      - sliding_window_moving_average:
+          window_size: 5
+          send_every: 1
+    internal: true
+    
+  # Sensor 3 - VWC with your calibration data
+  - platform: template
+    name: "Soil VWC Sensor 3"
+    id: soil_vwc_3
+    lambda: |-
+      float raw = id(moisture_raw_3).state * 4095;
+      
+      // Calibration points for Sensor 3
+      // VWC: 0%, 30%, 45%, 51%
+      // ADC: 3483, 2017, 1592, 1579
+      
+      if (raw >= 3483) {
+        return 0.0;
+      } else if (raw >= 2017) {
+        // 0-30% range
+        return 30.0 * (3483 - raw) / (3483 - 2017);
+      } else if (raw >= 1592) {
+        // 30-45% range
+        return 30.0 + 15.0 * (2017 - raw) / (2017 - 1592);
+      } else if (raw >= 1579) {
+        // 45-51% range - very small ADC change!
+        return 45.0 + 6.0 * (1592 - raw) / (1592 - 1579);
+      } else {
+        // Limited range above 51% for sensor 3
+        float slope = 6.0 / (1592 - 1579);
+        float vwc = 51.0 + slope * (1579 - raw);
+        if (vwc > 75.0) vwc = 75.0;
+        return vwc;
+      }
+    update_interval: ${update_interval}
+    unit_of_measurement: "% VWC"
+    accuracy_decimals: 1
+    device_class: moisture
+    filters:
+      - sliding_window_moving_average:
+          window_size: 3
+          send_every: 1
+    on_value:
+      then:
+        - mqtt.publish:
+            topic: greenhouse/soil${device_number}/sensor3_vwc
+            payload: !lambda 'return to_string(x);'
+            retain: true
+            
+  # Average VWC across all sensors
+  - platform: template
+    name: "Average Soil VWC"
+    id: soil_vwc_average
+    lambda: |-
+      int count = 0;
+      float sum = 0;
+      
+      if (!isnan(id(soil_vwc_1).state)) {
+        sum += id(soil_vwc_1).state;
+        count++;
+      }
+      if (!isnan(id(soil_vwc_2).state)) {
+        sum += id(soil_vwc_2).state;
+        count++;
+      }
+      if (!isnan(id(soil_vwc_3).state)) {
+        sum += id(soil_vwc_3).state;
+        count++;
+      }
+      
+      if (count > 0) {
+        return sum / count;
+      }
+      return NAN;
+    update_interval: ${update_interval}
+    unit_of_measurement: "% VWC"
+    accuracy_decimals: 1
+    device_class: moisture
+    on_value:
+      then:
+        - mqtt.publish:
+            topic: greenhouse/soil${device_number}/average_vwc
+            payload: !lambda 'return to_string(x);'
+            retain: true
+            
+  # Standard deviation to detect sensor issues
+  - platform: template
+    name: "VWC Standard Deviation"
+    lambda: |-
+      std::vector<float> values;
+      
+      if (!isnan(id(soil_vwc_1).state)) values.push_back(id(soil_vwc_1).state);
+      if (!isnan(id(soil_vwc_2).state)) values.push_back(id(soil_vwc_2).state);
+      if (!isnan(id(soil_vwc_3).state)) values.push_back(id(soil_vwc_3).state);
+      
+      if (values.size() < 2) return 0.0;
+      
+      float mean = 0;
+      for (float v : values) mean += v;
+      mean /= values.size();
+      
+      float variance = 0;
+      for (float v : values) {
+        variance += pow(v - mean, 2);
+      }
+      
+      return sqrt(variance / values.size());
+    update_interval: ${update_interval}
+    unit_of_measurement: "% VWC"
+    accuracy_decimals: 1
+    
+  # System monitoring
   - platform: wifi_signal
     name: "WiFi Signal"
-    update_interval: 10s
+    update_interval: 60s
+    
+  - platform: uptime
+    name: "Uptime"
 
-  # Capacitive soil moisture sensors (analog)
-  - platform: adc
-    pin: A0
-    name: "Soil Moisture 1"
-    id: soil_moisture_1
-    update_interval: 5s
-    accuracy_decimals: 1
-    filters:
-      - calibrate_linear:
-          # Calibrate these values for your sensors:
-          # Dry air reading -> 0%, Water reading -> 100%
-          - 2.8 -> 0.0
-          - 1.2 -> 100.0
-      - lambda: return max(0.0f, min(100.0f, x));
-    unit_of_measurement: "%"
-    icon: "mdi:water-percent"
-
-  - platform: adc
-    pin: A1
-    name: "Soil Moisture 2"
-    id: soil_moisture_2
-    update_interval: 5s
-    accuracy_decimals: 1
-    filters:
-      - calibrate_linear:
-          - 2.8 -> 0.0
-          - 1.2 -> 100.0
-      - lambda: return max(0.0f, min(100.0f, x));
-    unit_of_measurement: "%"
-    icon: "mdi:water-percent"
-
-  - platform: adc
-    pin: A2
-    name: "Soil Moisture 3"
-    id: soil_moisture_3
-    update_interval: 5s
-    accuracy_decimals: 1
-    filters:
-      - calibrate_linear:
-          - 2.8 -> 0.0
-          - 1.2 -> 100.0
-      - lambda: return max(0.0f, min(100.0f, x));
-    unit_of_measurement: "%"
-    icon: "mdi:water-percent"
-
-  # DS18B20 temperature sensors
-  - platform: dallas
-    address: 0x28FF1234567890A1  # Replace with actual sensor address
-    name: "Soil Temperature 1"
-    id: soil_temperature_1
-    filters:
-      - offset: 0.0
-    unit_of_measurement: "°C"
-    icon: "mdi:thermometer"
-
-  - platform: dallas
-    address: 0x28FF1234567890A2  # Replace with actual sensor address
-    name: "Soil Temperature 2"
-    id: soil_temperature_2
-    filters:
-      - offset: 0.0
-    unit_of_measurement: "°C"
-    icon: "mdi:thermometer"
-
-  - platform: dallas
-    address: 0x28FF1234567890A3  # Replace with actual sensor address
-    name: "Soil Temperature 3"
-    id: soil_temperature_3
-    filters:
-      - offset: 0.0
-    unit_of_measurement: "°C"
-    icon: "mdi:thermometer"
-
-# Binary sensors
+# Binary sensors for alerts
 binary_sensor:
-  - platform: status
-    name: "Status"
-
-# Text sensors
-text_sensor:
-  - platform: wifi_info
-    ip_address:
-      name: "IP Address"
-      update_interval: 30s
-      
-  # Current schedule info
   - platform: template
-    name: "Next Wake Schedule"
-    id: next_wake_info
-    update_interval: 30s
+    name: "Low Moisture Alert"
+    device_class: moisture
+    lambda: |-
+      return id(soil_vwc_average).state < 40.0;
+      
+  - platform: template
+    name: "High Moisture Alert"
+    device_class: moisture
+    lambda: |-
+      return id(soil_vwc_average).state > 65.0;
+      
+  - platform: template
+    name: "Sensor Deviation Alert"
+    device_class: problem
+    lambda: |-
+      // Alert if sensors differ by more than 10% VWC
+      return id(soil_vwc_1).state > 10.0;
 
-# Switches
-switch:
+# Text sensors for status
+text_sensor:
+  - platform: template
+    name: "Moisture Status"
+    lambda: |-
+      float avg = id(soil_vwc_average).state;
+      if (isnan(avg)) return {"Unknown"};
+      if (avg < 35) return {"Too Dry"};
+      if (avg < 40) return {"Dry - Irrigation Needed"};
+      if (avg < 45) return {"Optimal Low"};
+      if (avg < 60) return {"Optimal"};
+      if (avg < 65) return {"Optimal High"};
+      return {"Too Wet"};
+    update_interval: 30s
+    
+  - platform: template
+    name: "Sensor Health"
+    lambda: |-
+      char buffer[100];
+      sprintf(buffer, "S1: %.0f | S2: %.0f | S3: %.0f", 
+              id(moisture_raw_1).state * 4095,
+              id(moisture_raw_2).state * 4095,
+              id(moisture_raw_3).state * 4095);
+      return std::string(buffer);
+    update_interval: 60s
+
+# Buttons for manual control
+button:
   - platform: restart
     name: "Restart"
     
-  # Switch to disable deep sleep for debugging
   - platform: template
-    name: "Prevent Deep Sleep"
-    id: prevent_deep_sleep
-    optimistic: true
-    restore_mode: RESTORE_DEFAULT_OFF
-    turn_on_action:
-      - deep_sleep.prevent: deep_sleep_control
-    turn_off_action:
-      - deep_sleep.allow: deep_sleep_control
+    name: "Force Update"
+    on_press:
+      - component.update: moisture_raw_1
+      - component.update: moisture_raw_2
+      - component.update: moisture_raw_3
 
-# Smart scheduling logic
+# Status LED
+status_led:
+  pin:
+    number: GPIO8
+    inverted: true
+
+# Debug info publishing
 interval:
-  - interval: 50s  # Run 50 seconds after wake-up
+  - interval: 5min
     then:
-      - lambda: |-
-          auto time = id(homeassistant_time).now();
-          if (!time.is_valid()) {
-            ESP_LOGW("schedule", "Time not available, using default 2h sleep");
-            id(next_sleep_duration) = 7200;
-            return;
-          }
-          
-          int hour = time.hour;
-          int next_sleep = 7200; // Default 2 hours
-          std::string next_wake_msg = "Unknown";
-          
-          ESP_LOGI("schedule", "Current time: %02d:%02d", hour, time.minute);
-          
-          if (hour >= 6 && hour < 22) {
-            // Daytime: 6 AM to 10 PM - measure every 2 hours
-            next_sleep = 7200; // 2 hours
-            int next_hour = ((hour - 6) / 2 + 1) * 2 + 6;
-            if (next_hour >= 22) next_hour = 22;
-            next_wake_msg = "Next: " + to_string(next_hour) + ":00 (Day schedule)";
-          } else if (hour == 22) {
-            // 10 PM - sleep until 2 AM (4 hours)
-            next_sleep = 14400; // 4 hours
-            next_wake_msg = "Next: 02:00 (Night check)";
-          } else if (hour == 2) {
-            // 2 AM - sleep until 6 AM (4 hours)
-            next_sleep = 14400; // 4 hours
-            next_wake_msg = "Next: 06:00 (Day starts)";
-          } else {
-            // Other times - go to next scheduled time
-            if (hour >= 23 || hour < 2) {
-              // Sleep until 2 AM
-              int hours_to_2am = (2 - hour + 24) % 24;
-              if (hour >= 23) hours_to_2am = 2 + (24 - hour);
-              next_sleep = hours_to_2am * 3600;
-              next_wake_msg = "Next: 02:00 (Night check)";
-            } else {
-              // Sleep until 6 AM
-              int hours_to_6am = 6 - hour;
-              next_sleep = hours_to_6am * 3600;
-              next_wake_msg = "Next: 06:00 (Day starts)";
-            }
-          }
-          
-          ESP_LOGI("schedule", "Sleep duration: %d seconds (%d hours)", next_sleep, next_sleep/3600);
-          id(next_sleep_duration) = next_sleep;
-          id(next_wake_info).publish_state(next_wake_msg);
-          
-      - delay: 5s
-      - lambda: |-
-          ESP_LOGI("schedule", "Entering deep sleep for %d seconds", id(next_sleep_duration));
-          id(deep_sleep_control).set_sleep_duration(id(next_sleep_duration) * 1000);
-      - deep_sleep.enter: deep_sleep_control
-
-# Boot sequence - log schedule info
-on_boot:
-  then:
-    - delay: 30s  # Wait for time sync
-    - lambda: |-
-        auto time = id(homeassistant_time).now();
-        if (time.is_valid()) {
-          ESP_LOGI("boot", "Device woke up at %02d:%02d", time.hour, time.minute);
-        } else {
-          ESP_LOGI("boot", "Device woke up, waiting for time sync");
-        }
+      - mqtt.publish:
+          topic: greenhouse/soil${device_number}/debug
+          payload: !lambda |-
+            char buffer[200];
+            sprintf(buffer, "{\"s1_raw\":%.0f,\"s1_vwc\":%.1f,\"s2_raw\":%.0f,\"s2_vwc\":%.1f,\"s3_raw\":%.0f,\"s3_vwc\":%.1f,\"avg\":%.1f}",
+                    id(moisture_raw_1).state * 4095, id(soil_vwc_1).state,
+                    id(moisture_raw_2).state * 4095, id(soil_vwc_2).state,
+                    id(moisture_raw_3).state * 4095, id(soil_vwc_3).state,
+                    id(soil_vwc_average).state);
+            return std::string(buffer);
+          retain: false
