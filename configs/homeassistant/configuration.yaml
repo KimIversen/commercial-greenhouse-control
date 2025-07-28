@@ -26,7 +26,6 @@ recorder:
 
 # MQTT configuration with auto-discovery disabled for ESPHome
 mqtt:
-  discovery: false
   sensor:
     # Device 1
     - name: "Greenhouse Climate 1 Temperature"
