@@ -13,7 +13,7 @@ YELLOW := \033[1;33m
 RED := \033[0;31m
 NC := \033[0m # No Color
 
-.PHONY: help update update-configs update-scripts restart-all status logs backup health check-updates install-make
+.PHONY: help update update-makefile update-configs update-scripts restart-all status logs backup health check-updates install-make
 
 # Default target
 help:
@@ -22,6 +22,7 @@ help:
 	@echo ""
 	@echo "$(YELLOW)Available commands:$(NC)"
 	@echo "  $(GREEN)make update$(NC)          - Update all configs and restart services"
+	@echo "  $(GREEN)make update-makefile$(NC) - Update Makefile from GitHub"
 	@echo "  $(GREEN)make update-configs$(NC)  - Update configuration files only"
 	@echo "  $(GREEN)make update-scripts$(NC)  - Update scripts only"
 	@echo "  $(GREEN)make restart-all$(NC)     - Restart all Docker services"
@@ -38,8 +39,20 @@ help:
 	@echo "  make status              # Check if all services are running"
 
 # Main update command - updates everything and restarts
-update: check-updates update-configs update-scripts restart-all status
+update: check-updates update-makefile update-configs update-scripts restart-all status
 	@echo "$(GREEN)✅ Full system update completed!$(NC)"
+
+# Update Makefile itself
+update-makefile:
+	@echo "$(YELLOW)📥 Updating Makefile from GitHub...$(NC)"
+	@curl -s -o Makefile.new $(GITHUB_URL)/Makefile
+	@if [ -f Makefile.new ]; then \
+		mv Makefile Makefile.backup.$$(date +%Y%m%d_%H%M%S) 2>/dev/null || true; \
+		mv Makefile.new Makefile; \
+		echo "✅ Makefile updated"; \
+	else \
+		echo "$(RED)❌ Failed to download Makefile$(NC)"; \
+	fi
 
 # Update configuration files
 update-configs:

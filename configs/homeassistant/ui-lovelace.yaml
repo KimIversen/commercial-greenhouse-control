@@ -427,7 +427,7 @@ views:
         entities:
           - entity: button.restart_homeassistant
             name: Restart Home Assistant
-          - entity: button.backup_system
+          - entity: button.manual_backup
             name: Manual Backup
           - entity: switch.greenhouse_climate_1_ota_mode
             name: Climate 1 OTA Mode
