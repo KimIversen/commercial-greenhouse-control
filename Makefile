@@ -56,6 +56,16 @@ update-configs:
 		echo "$(RED)❌ Failed to download Home Assistant configuration$(NC)"; \
 	fi
 	
+	@echo "Downloading Home Assistant Lovelace dashboard..."
+	@curl -s -o config/homeassistant/ui-lovelace.yaml.new $(GITHUB_URL)/configs/homeassistant/ui-lovelace.yaml
+	@if [ -f config/homeassistant/ui-lovelace.yaml.new ]; then \
+		mv config/homeassistant/ui-lovelace.yaml config/homeassistant/ui-lovelace.yaml.backup.$$(date +%Y%m%d_%H%M%S) 2>/dev/null || true; \
+		mv config/homeassistant/ui-lovelace.yaml.new config/homeassistant/ui-lovelace.yaml; \
+		echo "✅ Home Assistant Lovelace dashboard updated"; \
+	else \
+		echo "$(RED)❌ Failed to download Home Assistant Lovelace dashboard$(NC)"; \
+	fi
+	
 	@echo "Downloading Docker Compose configuration..."
 	@curl -s -o docker-compose.yml.new $(GITHUB_URL)/configs/docker-compose.yml
 	@if [ -f docker-compose.yml.new ]; then \
