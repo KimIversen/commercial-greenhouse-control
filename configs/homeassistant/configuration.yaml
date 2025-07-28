@@ -24,6 +24,12 @@ recorder:
   auto_purge: true
   commit_interval: 1
 
+# Weather integration - MET Norway
+weather:
+  - platform: met
+    name: "Greenhouse Weather"
+
+# Cloud integration
 cloud:
 
 # MQTT configuration with auto-discovery disabled for ESPHome
