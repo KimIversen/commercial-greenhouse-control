@@ -59,39 +59,19 @@ views:
     cards:
       # Weather Forecast
       - type: weather-forecast
-        entity: weather.greenhouse_weather
+        entity: weather.forecast_hjem
         name: "Local Weather Forecast"
         show_current: true
         show_forecast: true
         forecast_type: daily
 
-      # Today's Weather Summary
-      - type: entities
-        title: Today's Weather
-        show_header_toggle: false
-        entities:
-          - entity: weather.greenhouse_weather
-            name: Current Conditions
-          - type: attribute
-            entity: weather.greenhouse_weather
-            attribute: temperature
-            name: Temperature
-            suffix: "°C"
-          - type: attribute
-            entity: weather.greenhouse_weather
-            attribute: humidity
-            name: Humidity  
-            suffix: "%"
-          - type: attribute
-            entity: weather.greenhouse_weather
-            attribute: pressure
-            name: Pressure
-            suffix: " mbar"
-          - type: attribute
-            entity: weather.greenhouse_weather
-            attribute: wind_speed
-            name: Wind Speed
-            suffix: " m/s"
+      - type: weather-forecast
+        entity: weather.forecast_hjem
+        name: "Local Weather Forecast"
+        show_current: true
+        show_forecast: true
+        forecast_type: hourly
+
       # Temperature Overview
       - type: custom:mini-graph-card
         entities:
