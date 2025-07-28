@@ -1,0 +1,212 @@
+substitutions:
+  device_number: "1"
+  device_ip: "192.168.10.150"
+  dht_pin_1: "GPIO2"
+  dht_pin_2: "GPIO3"
+
+esphome:
+  name: greenhouse-climate-${device_number}
+  friendly_name: Greenhouse Climate Sensor ${device_number}
+  comment: "Xiao ESP32C3 with dual DHT22 sensors (MQTT)"
+  
+esp32:
+  board: esp32-c3-devkitm-1
+  framework:
+    type: arduino
+
+# Enable logging
+logger:
+  level: INFO
+  
+# Enable Home Assistant API
+api:
+  encryption:
+    key: !secret api_encryption_key
+  reboot_timeout: 15min
+
+# Enable OTA updates
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  fast_connect: true
+  
+  manual_ip:
+    static_ip: ${device_ip}
+    gateway: 192.168.10.1
+    subnet: 255.255.255.0
+    dns1: 192.168.10.1
+  
+  # Fallback AP
+  ap:
+    ssid: "GH-Climate-${device_number}-FB"
+    password: !secret fallback_password
+
+# MQTT configuration
+mqtt:
+  broker: !secret mqtt_broker
+  username: !secret mqtt_username
+  password: !secret mqtt_password
+  port: 1883
+  topic_prefix: greenhouse/climate${device_number}
+  birth_message:
+    topic: greenhouse/climate${device_number}/status
+    payload: online
+    retain: true
+  will_message:
+    topic: greenhouse/climate${device_number}/status
+    payload: offline
+    retain: true
+
+sensor:
+  # DHT22 Sensor 1
+  - platform: dht
+    pin: ${dht_pin_1}
+    model: DHT22
+    temperature:
+      name: "Temperature 1"
+      id: temp1
+      accuracy_decimals: 1
+      on_value:
+        then:
+          - mqtt.publish:
+              topic: greenhouse/climate${device_number}/temp1
+              payload: !lambda 'return to_string(x);'
+              retain: true
+    humidity:
+      name: "Humidity 1"
+      id: hum1
+      accuracy_decimals: 1
+      on_value:
+        then:
+          - mqtt.publish:
+              topic: greenhouse/climate${device_number}/hum1
+              payload: !lambda 'return to_string(x);'
+              retain: true
+    update_interval: 30s
+    
+  # DHT22 Sensor 2
+  - platform: dht
+    pin: ${dht_pin_2}
+    model: DHT22
+    temperature:
+      name: "Temperature 2"
+      id: temp2
+      accuracy_decimals: 1
+      on_value:
+        then:
+          - mqtt.publish:
+              topic: greenhouse/climate${device_number}/temp2
+              payload: !lambda 'return to_string(x);'
+              retain: true
+    humidity:
+      name: "Humidity 2"
+      id: hum2
+      accuracy_decimals: 1
+      on_value:
+        then:
+          - mqtt.publish:
+              topic: greenhouse/climate${device_number}/hum2
+              payload: !lambda 'return to_string(x);'
+              retain: true
+    update_interval: 30s
+    
+  # Average temperature
+  - platform: template
+    name: "Average Temperature"
+    id: temp_avg
+    lambda: |-
+      if (!isnan(id(temp1).state) && !isnan(id(temp2).state)) {
+        return (id(temp1).state + id(temp2).state) / 2.0;
+      } else if (!isnan(id(temp1).state)) {
+        return id(temp1).state;
+      } else if (!isnan(id(temp2).state)) {
+        return id(temp2).state;
+      } else {
+        return NAN;
+      }
+    update_interval: 30s
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+    on_value:
+      then:
+        - mqtt.publish:
+            topic: greenhouse/climate${device_number}/temperature
+            payload: !lambda 'return to_string(x);'
+            retain: true
+        - mqtt.publish:
+            topic: greenhouse/climate${device_number}/sensor
+            payload: !lambda |-
+              char buf[100];
+              sprintf(buf, "{\"temperature\":%.1f,\"humidity\":%.1f}", 
+                      x, id(hum_avg).state);
+              return std::string(buf);
+            retain: true
+    
+  # Average humidity
+  - platform: template
+    name: "Average Humidity"
+    id: hum_avg
+    lambda: |-
+      if (!isnan(id(hum1).state) && !isnan(id(hum2).state)) {
+        return (id(hum1).state + id(hum2).state) / 2.0;
+      } else if (!isnan(id(hum1).state)) {
+        return id(hum1).state;
+      } else if (!isnan(id(hum2).state)) {
+        return id(hum2).state;
+      } else {
+        return NAN;
+      }
+    update_interval: 30s
+    unit_of_measurement: "%"
+    accuracy_decimals: 1
+    on_value:
+      then:
+        - mqtt.publish:
+            topic: greenhouse/climate${device_number}/humidity
+            payload: !lambda 'return to_string(x);'
+            retain: true
+    
+  # WiFi signal
+  - platform: wifi_signal
+    name: "WiFi Signal"
+    update_interval: 60s
+    on_value:
+      then:
+        - mqtt.publish:
+            topic: greenhouse/climate${device_number}/wifi_signal
+            payload: !lambda 'return to_string(x);'
+
+  # Uptime sensor
+  - platform: uptime
+    name: "Uptime"
+    update_interval: 60s
+
+# Status LED using built-in LED
+status_led:
+  pin:
+    number: GPIO8
+    inverted: true
+
+# Restart button
+button:
+  - platform: restart
+    name: "Restart"
+
+# Text sensor for version info
+text_sensor:
+  - platform: version
+    name: "ESPHome Version"
+    on_value:
+      then:
+        - mqtt.publish:
+            topic: greenhouse/climate${device_number}/version
+            payload: !lambda 'return x;'
+            retain: true
+  
+  - platform: wifi_info
+    ip_address:
+      name: "IP Address"

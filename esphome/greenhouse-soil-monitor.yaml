@@ -1,0 +1,220 @@
+substitutions:
+  device_number: "2"
+  device_ip: "192.168.10.153"
+
+  # ADC pins on XIAO ESP32-C3
+  moisture_pin_1: "GPIO2"   # A0
+  moisture_pin_2: "GPIO3"   # A1
+  moisture_pin_3: "GPIO4"   # A2
+
+  # Update cadence
+  update_interval: "30s"
+
+esphome:
+  name: greenhouse-soil-${device_number}
+  friendly_name: Greenhouse Soil Monitor ${device_number}
+  comment: "VWC for 3 sensors + average (piecewise linear calibration)"
+
+esp32:
+  board: seeed_xiao_esp32c3     # change to esp32-c3-devkitm-1 if you're truly on that board
+  framework:
+    type: arduino
+
+logger:
+  level: INFO
+
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  fast_connect: true
+  manual_ip:
+    static_ip: ${device_ip}
+    gateway: 192.168.10.1
+    subnet: 255.255.255.0
+    dns1: 192.168.10.1
+  ap:
+    ssid: "Soil-Monitor-${device_number}"
+    password: !secret fallback_password
+
+mqtt:
+  broker: !secret mqtt_broker
+  username: !secret mqtt_username
+  password: !secret mqtt_password
+  port: 1883
+  topic_prefix: greenhouse/soil${device_number}
+  birth_message:
+    topic: greenhouse/soil${device_number}/status
+    payload: online
+    retain: true
+  will_message:
+    topic: greenhouse/soil${device_number}/status
+    payload: offline
+    retain: true
+
+web_server:
+  port: 80
+
+time:
+  - platform: sntp
+    timezone: "Europe/Oslo"
+
+sensor:
+  # -------- RAW ADC channels (internal only) --------
+  - platform: adc
+    id: s1_raw
+    pin: ${moisture_pin_1}
+    raw: true                 # return 0..4095 counts
+    attenuation: 12db
+    update_interval: ${update_interval}
+    internal: true
+    filters:
+      - sliding_window_moving_average:
+          window_size: 5
+          send_every: 1
+
+  - platform: adc
+    id: s2_raw
+    pin: ${moisture_pin_2}
+    raw: true
+    attenuation: 12db
+    update_interval: ${update_interval}
+    internal: true
+    filters:
+      - sliding_window_moving_average:
+          window_size: 5
+          send_every: 1
+
+  - platform: adc
+    id: s3_raw
+    pin: ${moisture_pin_3}
+    raw: true
+    attenuation: 12db
+    update_interval: ${update_interval}
+    internal: true
+    filters:
+      - sliding_window_moving_average:
+          window_size: 5
+          send_every: 1
+
+  # -------- VWC (piecewise linear from RAW using calibrate_linear) --------
+  - platform: template
+    name: "Soil VWC Sensor 1"
+    id: soil_vwc_1
+    unit_of_measurement: "% VWC"
+    device_class: moisture
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: ${update_interval}
+    lambda: |-
+      return id(s1_raw).state;          // feed RAW counts into filters below
+    filters:
+      # Map RAW counts -> %VWC (ascending RAW order: wet->dry)
+      - calibrate_linear:
+          - 1345 -> 51.0
+          - 1396 -> 45.0
+          - 1556 -> 30.0
+          - 3408 -> 0.0
+      - sliding_window_moving_average:
+          window_size: 3
+          send_every: 1
+      - lambda: |-
+          // clamp to a sensible band
+          if (x < 0.0f) x = 0.0f;
+          if (x > 60.0f) x = 60.0f;
+          return x;
+    on_value:
+      - mqtt.publish:
+          topic: greenhouse/soil${device_number}/sensor1_vwc
+          payload: !lambda 'return to_string(x);'
+          retain: true
+
+  - platform: template
+    name: "Soil VWC Sensor 2"
+    id: soil_vwc_2
+    unit_of_measurement: "% VWC"
+    device_class: moisture
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: ${update_interval}
+    lambda: |-
+      return id(s2_raw).state;
+    filters:
+      - calibrate_linear:
+          - 1381 -> 51.0
+          - 1454 -> 45.0
+          - 1881 -> 30.0
+          - 3457 -> 0.0
+      - sliding_window_moving_average:
+          window_size: 3
+          send_every: 1
+      - lambda: |-
+          if (x < 0.0f) x = 0.0f;
+          if (x > 60.0f) x = 60.0f;
+          return x;
+    on_value:
+      - mqtt.publish:
+          topic: greenhouse/soil${device_number}/sensor2_vwc
+          payload: !lambda 'return to_string(x);'
+          retain: true
+
+  - platform: template
+    name: "Soil VWC Sensor 3"
+    id: soil_vwc_3
+    unit_of_measurement: "% VWC"
+    device_class: moisture
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: ${update_interval}
+    lambda: |-
+      return id(s3_raw).state;
+    filters:
+      - calibrate_linear:
+          - 1390 -> 51.0
+          - 1409 -> 45.0
+          - 1662 -> 30.0
+          - 3474 -> 0.0
+      - sliding_window_moving_average:
+          window_size: 3
+          send_every: 1
+      - lambda: |-
+          if (x < 0.0f) x = 0.0f;
+          if (x > 60.0f) x = 60.0f;
+          return x;
+    on_value:
+      - mqtt.publish:
+          topic: greenhouse/soil${device_number}/sensor3_vwc
+          payload: !lambda 'return to_string(x);'
+          retain: true
+
+  # -------- Average VWC --------
+  - platform: template
+    name: "Average Soil VWC"
+    id: soil_vwc_average
+    unit_of_measurement: "% VWC"
+    device_class: moisture
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: ${update_interval}
+    lambda: |-
+      float s1 = id(soil_vwc_1).state;
+      float s2 = id(soil_vwc_2).state;
+      float s3 = id(soil_vwc_3).state;
+      int n = 0;
+      float sum = 0.0f;
+      if (!isnan(s1)) { sum += s1; n++; }
+      if (!isnan(s2)) { sum += s2; n++; }
+      if (!isnan(s3)) { sum += s3; n++; }
+      return n > 0 ? sum / n : NAN;
+    on_value:
+      - mqtt.publish:
+          topic: greenhouse/soil${device_number}/average_vwc
+          payload: !lambda 'return to_string(x);'
+          retain: true

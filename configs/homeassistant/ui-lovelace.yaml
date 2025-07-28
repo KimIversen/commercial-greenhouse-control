@@ -1,0 +1,509 @@
+title: Commercial Greenhouse Control
+views:
+  - title: Overview
+    path: overview
+    icon: mdi:greenhouse
+    cards:
+      # System Status Header
+      - type: horizontal-stack
+        cards:
+          - type: entity
+            entity: binary_sensor.greenhouse_climate_1_status
+            name: Climate 1
+            icon: mdi:thermometer
+          - type: entity
+            entity: binary_sensor.greenhouse_climate_2_status  
+            name: Climate 2
+            icon: mdi:thermometer
+          - type: entity
+            entity: sensor.greenhouse_soil_1_average_vwc
+            name: Soil Zone 1
+            icon: mdi:water-percent
+          - type: entity
+            entity: sensor.greenhouse_soil_2_average_vwc
+            name: Soil Zone 2
+            icon: mdi:water-percent
+
+      # Environmental Conditions
+      - type: entities
+        title: Current Conditions
+        show_header_toggle: false
+        entities:
+          - entity: sensor.greenhouse_climate_1_temperature
+            name: Temperature Zone 1
+          - entity: sensor.greenhouse_climate_1_humidity
+            name: Humidity Zone 1
+          - entity: sensor.greenhouse_climate_2_temperature
+            name: Temperature Zone 2
+          - entity: sensor.greenhouse_climate_2_humidity
+            name: Humidity Zone 2
+          - type: divider
+          - entity: sensor.greenhouse_soil_1_average_vwc
+            name: Soil Moisture Zone 1
+          - entity: sensor.greenhouse_soil_2_average_vwc
+            name: Soil Moisture Zone 2
+
+      # Quick Actions
+      - type: entities
+        title: Quick Actions
+        show_header_toggle: false
+        entities:
+          - entity: switch.greenhouse_climate_1_ota_mode
+            name: Climate 1 OTA Mode
+          - entity: switch.greenhouse_climate_2_ota_mode
+            name: Climate 2 OTA Mode
+
+  - title: Climate
+    path: climate
+    icon: mdi:thermometer-lines
+    cards:
+      # Temperature Overview
+      - type: custom:mini-graph-card
+        entities:
+          - entity: sensor.greenhouse_climate_1_temperature
+            name: Zone 1
+          - entity: sensor.greenhouse_climate_2_temperature
+            name: Zone 2
+        name: Temperature Trends
+        hours_to_show: 24
+        points_per_hour: 2
+        line_width: 2
+        animate: true
+        show:
+          extrema: true
+          average: true
+
+      # Humidity Overview  
+      - type: custom:mini-graph-card
+        entities:
+          - entity: sensor.greenhouse_climate_1_humidity
+            name: Zone 1
+          - entity: sensor.greenhouse_climate_2_humidity
+            name: Zone 2
+        name: Humidity Trends
+        hours_to_show: 24
+        points_per_hour: 2
+        line_width: 2
+        animate: true
+        show:
+          extrema: true
+          average: true
+
+      # Current Readings
+      - type: horizontal-stack
+        cards:
+          - type: gauge
+            entity: sensor.greenhouse_climate_1_temperature
+            name: Zone 1 Temperature
+            min: 0
+            max: 40
+            severity:
+              green: 18
+              yellow: 25
+              red: 30
+          - type: gauge
+            entity: sensor.greenhouse_climate_2_temperature
+            name: Zone 2 Temperature
+            min: 0
+            max: 40
+            severity:
+              green: 18
+              yellow: 25
+              red: 30
+
+      - type: horizontal-stack
+        cards:
+          - type: gauge
+            entity: sensor.greenhouse_climate_1_humidity
+            name: Zone 1 Humidity
+            min: 0
+            max: 100
+            severity:
+              green: 60
+              yellow: 80
+              red: 90
+          - type: gauge
+            entity: sensor.greenhouse_climate_2_humidity
+            name: Zone 2 Humidity
+            min: 0
+            max: 100
+            severity:
+              green: 60
+              yellow: 80
+              red: 90
+
+      # Device Status
+      - type: entities
+        title: Climate Device Status
+        show_header_toggle: false
+        entities:
+          - entity: binary_sensor.greenhouse_climate_1_status
+            name: Zone 1 Device Status
+          - entity: sensor.greenhouse_climate_1_wifi_signal
+            name: Zone 1 WiFi Signal
+          - entity: binary_sensor.greenhouse_climate_2_status
+            name: Zone 2 Device Status
+          - entity: sensor.greenhouse_climate_2_wifi_signal
+            name: Zone 2 WiFi Signal
+
+  - title: Soil Moisture
+    path: soil
+    icon: mdi:water-percent
+    cards:
+      # Soil Moisture Trends
+      - type: custom:mini-graph-card
+        entities:
+          - entity: sensor.greenhouse_soil_1_average_vwc
+            name: Zone 1 Average
+          - entity: sensor.greenhouse_soil_2_average_vwc
+            name: Zone 2 Average
+        name: Soil Moisture Trends
+        hours_to_show: 48
+        points_per_hour: 1
+        line_width: 3
+        animate: true
+        show:
+          extrema: true
+          average: true
+        color_thresholds:
+          - value: 35
+            color: "#e74c3c"
+          - value: 45
+            color: "#f39c12"
+          - value: 60
+            color: "#27ae60"
+
+      # Zone 1 Detailed View
+      - type: entities
+        title: Soil Zone 1 - Individual Sensors
+        show_header_toggle: false
+        entities:
+          - entity: sensor.greenhouse_soil_1_1_vwc
+            name: Sensor 1.1
+          - entity: sensor.greenhouse_soil_1_2_vwc
+            name: Sensor 1.2
+          - entity: sensor.greenhouse_soil_1_3_vwc
+            name: Sensor 1.3
+          - type: divider
+          - entity: sensor.greenhouse_soil_1_average_vwc
+            name: Zone 1 Average
+
+      # Zone 2 Detailed View
+      - type: entities
+        title: Soil Zone 2 - Individual Sensors
+        show_header_toggle: false
+        entities:
+          - entity: sensor.greenhouse_soil_2_1_vwc
+            name: Sensor 2.1
+          - entity: sensor.greenhouse_soil_2_2_vwc
+            name: Sensor 2.2
+          - entity: sensor.greenhouse_soil_2_3_vwc
+            name: Sensor 2.3
+          - type: divider
+          - entity: sensor.greenhouse_soil_2_average_vwc
+            name: Zone 2 Average
+
+      # Moisture Status Gauges
+      - type: horizontal-stack
+        cards:
+          - type: gauge
+            entity: sensor.greenhouse_soil_1_average_vwc
+            name: Zone 1 Moisture
+            min: 0
+            max: 75
+            severity:
+              green: 45
+              yellow: 35
+              red: 25
+            needle: true
+          - type: gauge
+            entity: sensor.greenhouse_soil_2_average_vwc
+            name: Zone 2 Moisture
+            min: 0
+            max: 75
+            severity:
+              green: 45
+              yellow: 35
+              red: 25
+            needle: true
+
+      # Individual Sensor Trends - Zone 1
+      - type: custom:mini-graph-card
+        entities:
+          - entity: sensor.greenhouse_soil_1_1_vwc
+            name: Sensor 1.1
+          - entity: sensor.greenhouse_soil_1_2_vwc
+            name: Sensor 1.2
+          - entity: sensor.greenhouse_soil_1_3_vwc
+            name: Sensor 1.3
+        name: Zone 1 - Individual Sensor Trends
+        hours_to_show: 24
+        points_per_hour: 2
+        line_width: 2
+        animate: true
+
+      # Individual Sensor Trends - Zone 2
+      - type: custom:mini-graph-card
+        entities:
+          - entity: sensor.greenhouse_soil_2_1_vwc
+            name: Sensor 2.1
+          - entity: sensor.greenhouse_soil_2_2_vwc
+            name: Sensor 2.2
+          - entity: sensor.greenhouse_soil_2_3_vwc
+            name: Sensor 2.3
+        name: Zone 2 - Individual Sensor Trends  
+        hours_to_show: 24
+        points_per_hour: 2
+        line_width: 2
+        animate: true
+
+  - title: Fertigation
+    path: fertigation
+    icon: mdi:water-pump
+    cards:
+      # Tank Levels Overview
+      - type: horizontal-stack
+        cards:
+          - type: gauge
+            entity: sensor.fresh_water_tank_percent
+            name: Fresh Water
+            min: 0
+            max: 100
+            severity:
+              green: 40
+              yellow: 20
+              red: 10
+          - type: gauge
+            entity: sensor.fertilizer_a_tank_percent
+            name: Fertilizer A
+            min: 0
+            max: 100
+            severity:
+              green: 40
+              yellow: 20
+              red: 10
+          - type: gauge
+            entity: sensor.fertilizer_b_tank_percent
+            name: Fertilizer B
+            min: 0
+            max: 100
+            severity:
+              green: 40
+              yellow: 20
+              red: 10
+          - type: gauge
+            entity: sensor.mixed_tank_percent
+            name: Mixed Solution
+            min: 0
+            max: 100
+            severity:
+              green: 30
+              yellow: 15
+              red: 5
+
+      # Tank Volume Details
+      - type: entities
+        title: Tank Volumes
+        show_header_toggle: false
+        entities:
+          - entity: sensor.fresh_water_volume
+            name: Fresh Water Tank
+          - entity: sensor.fertilizer_a_volume
+            name: Fertilizer A Tank
+          - entity: sensor.fertilizer_b_volume
+            name: Fertilizer B Tank
+          - entity: sensor.mixed_tank_volume
+            name: Mixed Solution Tank
+
+      # System Status
+      - type: entities
+        title: System Status
+        show_header_toggle: false
+        entities:
+          - entity: binary_sensor.system_ready
+            name: System Ready
+          - entity: binary_sensor.low_water_alert
+            name: Low Water Alert
+          - entity: binary_sensor.low_fertilizer_alert
+            name: Low Fertilizer Alert
+          - entity: binary_sensor.ratio_deviation_alert
+            name: Ratio Deviation Alert
+
+      # Valve Controls
+      - type: entities
+        title: Valve Controls
+        show_header_toggle: false
+        entities:
+          - entity: switch.valve_fresh_water
+            name: Fresh Water Valve
+          - entity: switch.valve_venturi_line
+            name: Venturi Line Valve
+          - entity: switch.valve_mixed_tank
+            name: Mixed Tank Valve
+          - entity: switch.valve_irrigation
+            name: Irrigation Valve
+
+      # Flow Monitoring
+      - type: entities
+        title: Flow Monitoring
+        show_header_toggle: false
+        entities:
+          - entity: sensor.water_flow_rate
+            name: Water Flow Rate
+          - entity: sensor.fertilizer_a_flow_rate
+            name: Fertilizer A Flow Rate
+          - entity: sensor.fertilizer_b_flow_rate
+            name: Fertilizer B Flow Rate
+          - entity: sensor.fertilizer_a_ratio_deviation
+            name: A Ratio Deviation
+          - entity: sensor.fertilizer_b_ratio_deviation
+            name: B Ratio Deviation
+
+  - title: System Health
+    path: system
+    icon: mdi:monitor-dashboard
+    cards:
+      # Database Health
+      - type: entities
+        title: Database Status
+        show_header_toggle: false
+        entities:
+          - entity: sensor.database_size
+            name: Database Size
+          - entity: sensor.recorder_events
+            name: Recorded Events
+          - entity: sensor.recorder_states
+            name: Recorded States
+
+      # Device Connectivity
+      - type: entities
+        title: Device Connectivity
+        show_header_toggle: false
+        entities:
+          - entity: binary_sensor.greenhouse_climate_1_status
+            name: Climate Zone 1
+          - entity: binary_sensor.greenhouse_climate_2_status
+            name: Climate Zone 2
+          - entity: sensor.greenhouse_climate_1_wifi_signal
+            name: Climate 1 WiFi
+          - entity: sensor.greenhouse_climate_2_wifi_signal
+            name: Climate 2 WiFi
+
+      # System Resources (when available)
+      - type: conditional
+        conditions:
+          - entity: sensor.processor_use
+            state_not: unavailable
+        card:
+          type: entities
+          title: System Resources
+          show_header_toggle: false
+          entities:
+            - entity: sensor.processor_use
+              name: CPU Usage
+            - entity: sensor.memory_use_percent
+              name: Memory Usage
+            - entity: sensor.disk_use_percent
+              name: Disk Usage
+
+      # Service Status
+      - type: entities
+        title: Docker Services
+        show_header_toggle: false
+        entities:
+          - entity: binary_sensor.homeassistant_container
+            name: Home Assistant
+          - entity: binary_sensor.mariadb_container
+            name: MariaDB
+          - entity: binary_sensor.mosquitto_container
+            name: MQTT Broker
+          - entity: binary_sensor.esphome_container
+            name: ESPHome
+
+      # Maintenance Actions
+      - type: entities
+        title: Maintenance
+        show_header_toggle: false
+        entities:
+          - entity: button.restart_homeassistant
+            name: Restart Home Assistant
+          - entity: button.backup_system
+            name: Manual Backup
+          - entity: switch.greenhouse_climate_1_ota_mode
+            name: Climate 1 OTA Mode
+          - entity: switch.greenhouse_climate_2_ota_mode
+            name: Climate 2 OTA Mode
+
+  - title: History
+    path: history
+    icon: mdi:chart-line
+    cards:
+      # Long-term Temperature Trends
+      - type: custom:mini-graph-card
+        entities:
+          - entity: sensor.greenhouse_climate_1_temperature
+            name: Zone 1 Temp
+          - entity: sensor.greenhouse_climate_2_temperature
+            name: Zone 2 Temp
+        name: Temperature History (7 Days)
+        hours_to_show: 168
+        points_per_hour: 0.25
+        line_width: 2
+        animate: false
+        show:
+          extrema: true
+          average: true
+
+      # Long-term Humidity Trends
+      - type: custom:mini-graph-card
+        entities:
+          - entity: sensor.greenhouse_climate_1_humidity
+            name: Zone 1 Humidity
+          - entity: sensor.greenhouse_climate_2_humidity
+            name: Zone 2 Humidity
+        name: Humidity History (7 Days)
+        hours_to_show: 168
+        points_per_hour: 0.25
+        line_width: 2
+        animate: false
+        show:
+          extrema: true
+          average: true
+
+      # Long-term Soil Moisture Trends
+      - type: custom:mini-graph-card
+        entities:
+          - entity: sensor.greenhouse_soil_1_average_vwc
+            name: Zone 1 Soil
+          - entity: sensor.greenhouse_soil_2_average_vwc
+            name: Zone 2 Soil
+        name: Soil Moisture History (14 Days)
+        hours_to_show: 336
+        points_per_hour: 0.125
+        line_width: 2
+        animate: false
+        show:
+          extrema: true
+          average: true
+        color_thresholds:
+          - value: 35
+            color: "#e74c3c"
+          - value: 45
+            color: "#f39c12"
+          - value: 60
+            color: "#27ae60"
+
+      # Tank Level History
+      - type: custom:mini-graph-card
+        entities:
+          - entity: sensor.fresh_water_tank_percent
+            name: Fresh Water
+          - entity: sensor.mixed_tank_percent
+            name: Mixed Solution
+        name: Tank Level History (7 Days)
+        hours_to_show: 168
+        points_per_hour: 0.25
+        line_width: 2
+        animate: false
+        show:
+          extrema: true
