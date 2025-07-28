@@ -24,6 +24,8 @@ recorder:
   auto_purge: true
   commit_interval: 1
 
+cloud:
+
 # MQTT configuration with auto-discovery disabled for ESPHome
 mqtt:
   sensor:
