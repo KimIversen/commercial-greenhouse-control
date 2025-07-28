@@ -363,19 +363,7 @@ views:
     path: system
     icon: mdi:monitor-dashboard
     cards:
-      # Database Health
-      - type: entities
-        title: Database Status
-        show_header_toggle: false
-        entities:
-          - entity: sensor.database_size
-            name: Database Size
-          - entity: sensor.recorder_events
-            name: Recorded Events
-          - entity: sensor.recorder_states
-            name: Recorded States
-
-      # Device Connectivity
+      # Device Connectivity (existing sensors)
       - type: entities
         title: Device Connectivity
         show_header_toggle: false
@@ -385,28 +373,35 @@ views:
           - entity: binary_sensor.greenhouse_climate_2_status
             name: Climate Zone 2
           - entity: sensor.greenhouse_climate_1_wifi_signal
-            name: Climate 1 WiFi
+            name: Climate 1 WiFi Signal
           - entity: sensor.greenhouse_climate_2_wifi_signal
-            name: Climate 2 WiFi
+            name: Climate 2 WiFi Signal
 
-      # System Resources (when available)
-      - type: conditional
-        conditions:
-          - entity: sensor.processor_use
-            state_not: unavailable
-        card:
-          type: entities
-          title: System Resources
-          show_header_toggle: false
-          entities:
-            - entity: sensor.processor_use
-              name: CPU Usage
-            - entity: sensor.memory_use_percent
-              name: Memory Usage
-            - entity: sensor.disk_use_percent
-              name: Disk Usage
+      # System Resources 
+      - type: entities
+        title: System Resources
+        show_header_toggle: false
+        entities:
+          - entity: sensor.cpu_usage
+            name: CPU Usage
+          - entity: sensor.memory_usage
+            name: Memory Usage
+          - entity: sensor.disk_usage
+            name: Disk Usage
 
-      # Service Status
+      # Database Health
+      - type: entities
+        title: Database Status
+        show_header_toggle: false
+        entities:
+          - entity: sensor.database_size
+            name: Database Size
+          - entity: sensor.recorder_events
+            name: Recorded Events (24h)
+          - entity: sensor.recorder_states
+            name: Recorded States (24h)
+
+      # Docker Services Status
       - type: entities
         title: Docker Services
         show_header_toggle: false
@@ -425,10 +420,11 @@ views:
         title: Maintenance
         show_header_toggle: false
         entities:
-          - entity: button.restart_homeassistant
+          - entity: input_button.restart_homeassistant
             name: Restart Home Assistant
-          - entity: button.manual_backup
+          - entity: input_button.manual_backup
             name: Manual Backup
+          - type: divider
           - entity: switch.greenhouse_climate_1_ota_mode
             name: Climate 1 OTA Mode
           - entity: switch.greenhouse_climate_2_ota_mode

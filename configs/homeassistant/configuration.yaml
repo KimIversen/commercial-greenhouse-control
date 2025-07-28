@@ -24,8 +24,9 @@ recorder:
   auto_purge: true
   commit_interval: 1
 
-# MQTT (broker credentials now set via the UI integration)
+# MQTT configuration with auto-discovery disabled for ESPHome
 mqtt:
+  discovery: false
   sensor:
     # Device 1
     - name: "Greenhouse Climate 1 Temperature"
@@ -179,16 +180,24 @@ scene:      !include scenes.yaml
 
 # System monitoring sensors
 sensor:
-  # System resources
-  - platform: systemmonitor
-    resources:
-      - type: processor_use
-      - type: memory_use_percent
-      - type: disk_use_percent
-        arg: /
-      - type: load_1m
-      - type: load_5m
-      - type: load_15m
+  # System resource monitoring via command line
+  - platform: command_line
+    name: "CPU Usage"
+    command: "top -bn1 | grep 'Cpu(s)' | awk '{print $2}' | sed 's/%us,//'"
+    unit_of_measurement: "%"
+    scan_interval: 60
+    
+  - platform: command_line
+    name: "Memory Usage"
+    command: "free | grep Mem | awk '{printf \"%.1f\", $3/$2 * 100.0}'"
+    unit_of_measurement: "%"
+    scan_interval: 60
+    
+  - platform: command_line
+    name: "Disk Usage"
+    command: "df -h / | awk 'NR==2{printf \"%s\", $5}' | sed 's/%//'"
+    unit_of_measurement: "%"
+    scan_interval: 60
 
   # Database monitoring
   - platform: sql
@@ -243,19 +252,32 @@ binary_sensor:
     device_class: running
     scan_interval: 60
 
-# Restart buttons
-button:
-  - platform: template
-    name: "Restart HomeAssistant"
+# Restart and backup automation
+automation manual_restart:
+  alias: "Manual Restart HomeAssistant"
+  trigger:
+    - platform: event
+      event_type: manual_restart_request
+  action:
+    - service: homeassistant.restart
+
+automation manual_backup:
+  alias: "Manual Backup"
+  trigger:
+    - platform: event
+      event_type: manual_backup_request
+  action:
+    - service: shell_command.manual_backup
+
+# Input buttons for manual actions
+input_button:
+  restart_homeassistant:
+    name: "Restart Home Assistant"
     icon: mdi:restart
-    press:
-      service: homeassistant.restart
     
-  - platform: template
+  manual_backup:
     name: "Manual Backup"
     icon: mdi:content-save
-    press:
-      service: shell_command.manual_backup
 
 
 # Zones
