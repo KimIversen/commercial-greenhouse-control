@@ -70,7 +70,7 @@ sensor:
   # Soil Moisture Sensors (now only 2 sensors)
   - name: "Greenhouse Soil 2 VWC Sensor 1"
     state_topic: "greenhouse/soil2/sensor1_vwc"
-    unit_of_measurement: "% VWC"
+    unit_of_measurement: "%"
     device_class: moisture
     state_class: measurement
     value_template: "{{ value | float(0) | round(1) }}"
@@ -78,7 +78,7 @@ sensor:
     
   - name: "Greenhouse Soil 2 VWC Sensor 2"
     state_topic: "greenhouse/soil2/sensor2_vwc"
-    unit_of_measurement: "% VWC"
+    unit_of_measurement: "%"
     device_class: moisture
     state_class: measurement
     value_template: "{{ value | float(0) | round(1) }}"
@@ -86,7 +86,7 @@ sensor:
     
   - name: "Greenhouse Soil 2 Average VWC"
     state_topic: "greenhouse/soil2/average_vwc"
-    unit_of_measurement: "% VWC"
+    unit_of_measurement: "%"
     device_class: moisture
     state_class: measurement
     value_template: "{{ value | float(0) | round(1) }}"
