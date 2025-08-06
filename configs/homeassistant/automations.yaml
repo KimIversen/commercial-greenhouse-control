@@ -1,0 +1,132 @@
+# Automations for Greenhouse Control System
+
+# Manual restart HomeAssistant
+- id: 'manual_restart_homeassistant'
+  alias: "Manual Restart HomeAssistant"
+  trigger:
+    - platform: event
+      event_type: manual_restart_request
+  action:
+    - service: homeassistant.restart
+
+# Manual backup
+- id: 'manual_backup'
+  alias: "Manual Backup"
+  trigger:
+    - platform: event
+      event_type: manual_backup_request
+  action:
+    - service: shell_command.manual_backup
+
+# ============== SOIL MONITOR 2 BATTERY AUTOMATIONS ==============
+
+# Set initial OTA mode OFF via MQTT when HA starts
+- id: 'soil2_set_initial_ota_mode'
+  alias: 'Soil 2 - Set Initial OTA Mode'
+  description: 'Set OTA mode to OFF on HA startup via retained MQTT'
+  trigger:
+    - platform: homeassistant
+      event: start
+  action:
+    - service: mqtt.publish
+      data:
+        topic: "greenhouse/soil2/ota_mode/set"
+        payload: "OFF"
+        retain: true
+    - service: system_log.write
+      data:
+        message: "Set Soil Monitor 2 OTA mode to OFF (retained)"
+        level: info
+
+# Low battery alert (20%)
+- id: 'soil2_low_battery_alert'
+  alias: 'Soil 2 - Low Battery Alert'
+  description: 'Alert when battery level drops below 20%'
+  trigger:
+    - platform: numeric_state
+      entity_id: sensor.greenhouse_soil_2_battery_level
+      below: 20
+  action:
+    - service: notify.persistent_notification
+      data:
+        title: "⚠️ Low Battery - Soil Monitor 2"
+        message: >
+          Battery: {{ states('sensor.greenhouse_soil_2_battery_level') }}%
+          Voltage: {{ states('sensor.greenhouse_soil_2_battery_voltage') }}V
+          Days remaining: {{ states('sensor.greenhouse_soil_2_battery_days_remaining') }}
+
+# Critical battery alert (10%)
+- id: 'soil2_critical_battery_alert'
+  alias: 'Soil 2 - Critical Battery Alert'
+  description: 'Critical alert when battery level drops below 10%'
+  trigger:
+    - platform: numeric_state
+      entity_id: sensor.greenhouse_soil_2_battery_level
+      below: 10
+  action:
+    - service: notify.persistent_notification
+      data:
+        title: "🔴 CRITICAL Battery - Soil Monitor 2"
+        message: >
+          CRITICAL: Battery level is {{ states('sensor.greenhouse_soil_2_battery_level') }}%.
+          The device may stop functioning soon. Immediate action required!
+    - service: notify.critical_alerts
+      data:
+        title: "CRITICAL: Soil Monitor 2 Battery"
+        message: >
+          Battery level critically low at {{ states('sensor.greenhouse_soil_2_battery_level') }}%.
+          Device may shut down imminently.
+
+# Extended offline alert (considering deep sleep)
+- id: 'soil2_extended_offline_alert'
+  alias: 'Soil 2 - Extended Offline Alert'
+  description: 'Alert if device hasnt reported for over 30 minutes (2x sleep cycle)'
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.greenhouse_soil_2_extended_offline
+      to: 'on'
+      for:
+        minutes: 5  # Give it 5 extra minutes to be sure
+  action:
+    - service: notify.persistent_notification
+      data:
+        title: "⚠️ Soil Monitor 2 Extended Offline"
+        message: >
+          Device has not reported for over 30 minutes.
+          Last battery level: {{ states('sensor.greenhouse_soil_2_battery_level') }}%.
+          This may indicate connectivity issues or dead battery.
+
+# OTA mode reminder if left on too long
+- id: 'soil2_ota_mode_reminder'
+  alias: 'Soil 2 - OTA Mode Active Reminder'
+  description: 'Remind to disable OTA mode if left on for too long'
+  trigger:
+    - platform: state
+      entity_id: switch.greenhouse_soil_2_ota_mode
+      to: 'on'
+      for:
+        hours: 1
+  action:
+    - service: notify.persistent_notification
+      data:
+        title: "📡 OTA Mode Still Active - Soil Monitor 2"
+        message: >
+          OTA mode has been active for over 1 hour.
+          Battery level: {{ states('sensor.greenhouse_soil_2_battery_level') }}%.
+          Consider disabling OTA mode to preserve battery life.
+
+# Device overheating alert
+- id: 'soil2_overheating_alert'
+  alias: 'Soil 2 - Device Overheating Alert'
+  description: 'Alert when device temperature exceeds safe limits'
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.greenhouse_soil_2_overheating
+      to: 'on'
+  action:
+    - service: notify.persistent_notification
+      data:
+        title: "🌡️ Device Overheating - Soil Monitor 2"
+        message: >
+          Device temperature is {{ states('sensor.greenhouse_soil_2_device_temperature') }}°C.
+          This may indicate hardware issues or poor ventilation.

@@ -79,6 +79,46 @@ update-configs:
 		echo "$(RED)❌ Failed to download Home Assistant Lovelace dashboard$(NC)"; \
 	fi
 	
+	@echo "Downloading MQTT sensor configuration..."
+	@curl -s -o config/homeassistant/mqtt.yaml.new $(GITHUB_URL)/configs/homeassistant/mqtt.yaml
+	@if [ -f config/homeassistant/mqtt.yaml.new ]; then \
+		mv config/homeassistant/mqtt.yaml config/homeassistant/mqtt.yaml.backup.$$(date +%Y%m%d_%H%M%S) 2>/dev/null || true; \
+		mv config/homeassistant/mqtt.yaml.new config/homeassistant/mqtt.yaml; \
+		echo "✅ MQTT sensor configuration updated"; \
+	else \
+		echo "$(RED)❌ Failed to download MQTT sensor configuration$(NC)"; \
+	fi
+	
+	@echo "Downloading sensors configuration..."
+	@curl -s -o config/homeassistant/sensors.yaml.new $(GITHUB_URL)/configs/homeassistant/sensors.yaml
+	@if [ -f config/homeassistant/sensors.yaml.new ]; then \
+		mv config/homeassistant/sensors.yaml config/homeassistant/sensors.yaml.backup.$$(date +%Y%m%d_%H%M%S) 2>/dev/null || true; \
+		mv config/homeassistant/sensors.yaml.new config/homeassistant/sensors.yaml; \
+		echo "✅ Sensors configuration updated"; \
+	else \
+		echo "$(RED)❌ Failed to download sensors configuration$(NC)"; \
+	fi
+	
+	@echo "Downloading automations configuration..."
+	@curl -s -o config/homeassistant/automations.yaml.new $(GITHUB_URL)/configs/homeassistant/automations.yaml
+	@if [ -f config/homeassistant/automations.yaml.new ]; then \
+		mv config/homeassistant/automations.yaml config/homeassistant/automations.yaml.backup.$$(date +%Y%m%d_%H%M%S) 2>/dev/null || true; \
+		mv config/homeassistant/automations.yaml.new config/homeassistant/automations.yaml; \
+		echo "✅ Automations configuration updated"; \
+	else \
+		echo "$(RED)❌ Failed to download automations configuration$(NC)"; \
+	fi
+	
+	@echo "Downloading scripts configuration..."
+	@curl -s -o config/homeassistant/scripts.yaml.new $(GITHUB_URL)/configs/homeassistant/scripts.yaml
+	@if [ -f config/homeassistant/scripts.yaml.new ]; then \
+		mv config/homeassistant/scripts.yaml config/homeassistant/scripts.yaml.backup.$$(date +%Y%m%d_%H%M%S) 2>/dev/null || true; \
+		mv config/homeassistant/scripts.yaml.new config/homeassistant/scripts.yaml; \
+		echo "✅ Scripts configuration updated"; \
+	else \
+		echo "$(RED)❌ Failed to download scripts configuration$(NC)"; \
+	fi
+	
 	@echo "Downloading Docker Compose configuration..."
 	@curl -s -o docker-compose.yml.new $(GITHUB_URL)/configs/docker-compose.yml
 	@if [ -f docker-compose.yml.new ]; then \

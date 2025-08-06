@@ -1,0 +1,229 @@
+# Lovelace card configuration for Battery-Powered Soil Monitor 2
+# Add this to your dashboard or include in ui-lovelace.yaml
+
+type: vertical-stack
+cards:
+  # Device Header with Status
+  - type: custom:button-card
+    entity: binary_sensor.greenhouse_soil_monitor_2_device_status
+    name: Soil Monitor 2 (Battery)
+    icon: mdi:flower
+    show_state: true
+    styles:
+      card:
+        - background: >
+            [[[ 
+              if (entity.state === 'on') return 'linear-gradient(90deg, #28a745, #20c997)';
+              else return 'linear-gradient(90deg, #dc3545, #fd7e14)';
+            ]]]
+        - color: white
+        - font-weight: bold
+        - padding: 15px
+      icon:
+        - color: white
+        - width: 40px
+      name:
+        - font-size: 18px
+      state:
+        - font-size: 14px
+    state_display: >
+      [[[
+        if (entity.state === 'on') return 'Online';
+        else return 'Offline';
+      ]]]
+
+  # Battery and Power Management
+  - type: horizontal-stack
+    cards:
+      - type: gauge
+        entity: sensor.greenhouse_soil_monitor_2_battery_level
+        name: Battery
+        needle: true
+        severity:
+          green: 40
+          yellow: 20
+          red: 10
+        min: 0
+        max: 100
+        unit: '%'
+        
+      - type: entities
+        entities:
+          - entity: sensor.greenhouse_soil_monitor_2_battery_voltage
+            name: Voltage
+            icon: mdi:flash
+          - entity: sensor.soil_monitor_2_estimated_battery_life
+            name: Est. Life
+            icon: mdi:battery-clock
+          - entity: sensor.soil_monitor_2_sleep_status
+            name: Status
+            icon: mdi:power-sleep
+
+  # OTA and Device Controls
+  - type: entities
+    title: Device Controls
+    show_header_toggle: false
+    entities:
+      - entity: switch.greenhouse_soil_monitor_2_ota_mode
+        name: OTA Mode
+        secondary_info: >
+          When ON, device stays awake for updates
+      - entity: button.greenhouse_soil_monitor_2_restart_device
+        name: Restart Device
+      - entity: button.greenhouse_soil_monitor_2_force_sleep
+        name: Force Sleep
+      - type: divider
+      - entity: script.soil_monitor_2_wake_for_update
+        name: Wake for Update
+        icon: mdi:upload
+      - entity: script.soil_monitor_2_mark_battery_charged
+        name: Mark Battery Charged
+        icon: mdi:battery-charging
+
+  # Sensor Readings Grid
+  - type: grid
+    columns: 2
+    cards:
+      # Soil Moisture
+      - type: custom:mini-graph-card
+        name: Soil Moisture
+        entities:
+          - entity: sensor.greenhouse_soil_monitor_2_soil_vwc_sensor_1
+            name: Sensor 1
+            color: '#2196f3'
+          - entity: sensor.greenhouse_soil_monitor_2_soil_vwc_sensor_2
+            name: Sensor 2
+            color: '#4caf50'
+          - entity: sensor.greenhouse_soil_monitor_2_average_soil_vwc
+            name: Average
+            color: '#ff9800'
+            show_fill: false
+        hours_to_show: 24
+        points_per_hour: 4
+        line_width: 2
+        show:
+          labels: true
+          legend: true
+        color_thresholds:
+          - value: 0
+            color: '#f44336'
+          - value: 25
+            color: '#ff9800'
+          - value: 35
+            color: '#ffeb3b'
+          - value: 45
+            color: '#4caf50'
+
+      # Temperature Readings
+      - type: custom:mini-graph-card
+        name: Temperature
+        entities:
+          - entity: sensor.greenhouse_soil_monitor_2_soil_temperature_1
+            name: Soil 1
+            color: '#8b4513'
+          - entity: sensor.greenhouse_soil_monitor_2_soil_temperature_2
+            name: Soil 2
+            color: '#a0522d'
+          - entity: sensor.greenhouse_soil_monitor_2_air_temperature_1
+            name: Air 1
+            color: '#87ceeb'
+          - entity: sensor.greenhouse_soil_monitor_2_air_temperature_2
+            name: Air 2
+            color: '#4682b4'
+        hours_to_show: 24
+        points_per_hour: 4
+        line_width: 2
+        show:
+          labels: true
+          legend: true
+
+      # Humidity Readings
+      - type: custom:mini-graph-card
+        name: Humidity
+        entities:
+          - entity: sensor.greenhouse_soil_monitor_2_air_humidity_1
+            name: Sensor 1
+            color: '#00bcd4'
+          - entity: sensor.greenhouse_soil_monitor_2_air_humidity_2
+            name: Sensor 2
+            color: '#009688'
+        hours_to_show: 24
+        points_per_hour: 4
+        line_width: 2
+        show:
+          labels: true
+          legend: true
+        unit: '%'
+
+      # Device Health
+      - type: entities
+        title: Device Health
+        entities:
+          - entity: sensor.greenhouse_soil_monitor_2_wifi_signal
+            name: WiFi Signal
+            icon: mdi:wifi
+          - entity: sensor.greenhouse_soil_monitor_2_device_temperature
+            name: CPU Temp
+            icon: mdi:thermometer
+          - entity: sensor.greenhouse_soil_monitor_2_uptime
+            name: Uptime
+            icon: mdi:clock-outline
+          - entity: sensor.greenhouse_soil_monitor_2_free_heap
+            name: Free Memory
+            icon: mdi:memory
+
+  # Battery History
+  - type: custom:mini-graph-card
+    name: Battery History (7 days)
+    entities:
+      - entity: sensor.greenhouse_soil_monitor_2_battery_level
+        name: Battery Level
+        color: >
+          [[[
+            const level = states['sensor.greenhouse_soil_monitor_2_battery_level'].state;
+            if (level > 40) return '#4caf50';
+            else if (level > 20) return '#ff9800';
+            else return '#f44336';
+          ]]]
+    hours_to_show: 168
+    points_per_hour: 0.25
+    line_width: 2
+    show:
+      labels: true
+      points: false
+      average: true
+      extrema: true
+    color_thresholds:
+      - value: 0
+        color: '#f44336'
+      - value: 20
+        color: '#ff9800'
+      - value: 40
+        color: '#4caf50'
+
+  # Alert Status
+  - type: conditional
+    conditions:
+      - entity: binary_sensor.greenhouse_soil_monitor_2_low_battery_alert
+        state: 'on'
+    card:
+      type: custom:button-card
+      name: Low Battery Warning
+      icon: mdi:battery-alert
+      styles:
+        card:
+          - background: '#ff9800'
+          - color: white
+          - padding: 10px
+          - animation: blink 2s ease infinite
+        icon:
+          - color: white
+      tap_action:
+        action: call-service
+        service: script.soil_monitor_2_mark_battery_charged
+
+# CSS Animation (add to theme or www/custom.css)
+# @keyframes blink {
+#   0%, 100% { opacity: 1; }
+#   50% { opacity: 0.5; }
+# }

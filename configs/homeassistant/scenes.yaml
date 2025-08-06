@@ -1,0 +1,10 @@
+# Scenes for Greenhouse Control System
+# Currently empty - add scenes as needed
+
+# Example scene structure:
+# - name: "Evening Mode"
+#   entities:
+#     light.greenhouse_main:
+#       state: 'off'
+#     switch.greenhouse_irrigation:
+#       state: 'on'

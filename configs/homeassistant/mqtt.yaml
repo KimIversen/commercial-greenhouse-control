@@ -1,0 +1,242 @@
+# MQTT Configuration for all Greenhouse Devices
+# This file consolidates all MQTT sensors, switches, and binary sensors
+
+sensor:
+  # ============== CLIMATE SENSORS ==============
+  # Device 1
+  - name: "Greenhouse Climate 1 Temperature"
+    state_topic: "greenhouse/climate1/temperature"
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    
+  - name: "Greenhouse Climate 1 Humidity"
+    state_topic: "greenhouse/climate1/humidity"
+    unit_of_measurement: "%"
+    device_class: humidity
+    state_class: measurement
+    
+  - name: "Greenhouse Climate 1 WiFi Signal"
+    state_topic: "greenhouse/climate1/wifi_signal"
+    unit_of_measurement: "dBm"
+    device_class: signal_strength
+    entity_category: diagnostic
+    
+  # Device 2
+  - name: "Greenhouse Climate 2 Temperature"
+    state_topic: "greenhouse/climate2/temperature"
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    
+  - name: "Greenhouse Climate 2 Humidity"
+    state_topic: "greenhouse/climate2/humidity"
+    unit_of_measurement: "%"
+    device_class: humidity
+    state_class: measurement
+
+  - name: "Greenhouse Climate 2 WiFi Signal"
+    state_topic: "greenhouse/climate2/wifi_signal"
+    unit_of_measurement: "dBm"
+    device_class: signal_strength
+    entity_category: diagnostic
+
+  # ============== SOIL MONITOR 1 ==============
+  - name: "Greenhouse Soil 1.1 VWC"
+    state_topic: "greenhouse/soil1/sensor1_vwc"
+    unit_of_measurement: "%"
+    device_class: moisture
+    state_class: measurement
+    
+  - name: "Greenhouse Soil 1.2 VWC"
+    state_topic: "greenhouse/soil1/sensor2_vwc"
+    unit_of_measurement: "%"
+    device_class: moisture
+    state_class: measurement
+    
+  - name: "Greenhouse Soil 1.3 VWC"
+    state_topic: "greenhouse/soil1/sensor3_vwc"
+    unit_of_measurement: "%"
+    device_class: moisture
+    state_class: measurement
+    
+  - name: "Greenhouse Soil 1 Average VWC"
+    state_topic: "greenhouse/soil1/average_vwc"
+    unit_of_measurement: "%"
+    device_class: moisture
+    state_class: measurement
+
+  # ============== SOIL MONITOR 2 (BATTERY) ==============
+  # Soil Moisture Sensors (now only 2 sensors)
+  - name: "Greenhouse Soil 2 VWC Sensor 1"
+    state_topic: "greenhouse/soil2/sensor1_vwc"
+    unit_of_measurement: "% VWC"
+    device_class: moisture
+    state_class: measurement
+    value_template: "{{ value | float(0) | round(1) }}"
+    icon: mdi:water-percent
+    
+  - name: "Greenhouse Soil 2 VWC Sensor 2"
+    state_topic: "greenhouse/soil2/sensor2_vwc"
+    unit_of_measurement: "% VWC"
+    device_class: moisture
+    state_class: measurement
+    value_template: "{{ value | float(0) | round(1) }}"
+    icon: mdi:water-percent
+    
+  - name: "Greenhouse Soil 2 Average VWC"
+    state_topic: "greenhouse/soil2/average_vwc"
+    unit_of_measurement: "% VWC"
+    device_class: moisture
+    state_class: measurement
+    value_template: "{{ value | float(0) | round(1) }}"
+    icon: mdi:water
+
+  # Soil Temperature Sensors (DS18B20)
+  - name: "Greenhouse Soil 2 Temperature 1"
+    state_topic: "greenhouse/soil2/soil_temp_1"
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    value_template: "{{ value | float(0) | round(1) }}"
+    
+  - name: "Greenhouse Soil 2 Temperature 2"
+    state_topic: "greenhouse/soil2/soil_temp_2"
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    value_template: "{{ value | float(0) | round(1) }}"
+
+  # Air Temperature Sensors (DHT22)
+  - name: "Greenhouse Soil 2 Air Temperature 1"
+    state_topic: "greenhouse/soil2/air_temp_1"
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    value_template: "{{ value | float(0) | round(1) }}"
+    
+  - name: "Greenhouse Soil 2 Air Temperature 2"
+    state_topic: "greenhouse/soil2/air_temp_2"
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    value_template: "{{ value | float(0) | round(1) }}"
+
+  # Humidity Sensors (DHT22)
+  - name: "Greenhouse Soil 2 Air Humidity 1"
+    state_topic: "greenhouse/soil2/air_humidity_1"
+    unit_of_measurement: "%"
+    device_class: humidity
+    state_class: measurement
+    value_template: "{{ value | float(0) | round(1) }}"
+    
+  - name: "Greenhouse Soil 2 Air Humidity 2"
+    state_topic: "greenhouse/soil2/air_humidity_2"
+    unit_of_measurement: "%"
+    device_class: humidity
+    state_class: measurement
+    value_template: "{{ value | float(0) | round(1) }}"
+
+  # Battery Monitoring
+  - name: "Greenhouse Soil 2 Battery Voltage"
+    state_topic: "greenhouse/soil2/battery_voltage"
+    unit_of_measurement: "V"
+    device_class: voltage
+    state_class: measurement
+    value_template: "{{ value | float(0) | round(2) }}"
+    icon: mdi:flash
+    
+  - name: "Greenhouse Soil 2 Battery Level"
+    state_topic: "greenhouse/soil2/battery_level"
+    unit_of_measurement: "%"
+    device_class: battery
+    state_class: measurement
+    value_template: "{{ value | float(0) | round(0) }}"
+
+  # Averaged Data (JSON parsing)
+  - name: "Greenhouse Soil 2 Reading Count"
+    state_topic: "greenhouse/soil2/averaged_data"
+    value_template: "{{ value_json.readings }}"
+    unit_of_measurement: "readings"
+    icon: mdi:counter
+
+  # Diagnostics (JSON parsing)
+  - name: "Greenhouse Soil 2 Uptime"
+    state_topic: "greenhouse/soil2/diagnostics"
+    value_template: "{{ value_json.uptime }}"
+    unit_of_measurement: "s"
+    device_class: duration
+    state_class: total_increasing
+    icon: mdi:timer-outline
+    
+  - name: "Greenhouse Soil 2 WiFi RSSI"
+    state_topic: "greenhouse/soil2/diagnostics"
+    value_template: "{{ value_json.wifi_rssi }}"
+    unit_of_measurement: "dBm"
+    device_class: signal_strength
+    state_class: measurement
+    icon: mdi:wifi
+    
+  - name: "Greenhouse Soil 2 Free Heap"
+    state_topic: "greenhouse/soil2/diagnostics"
+    value_template: "{{ value_json.free_heap }}"
+    unit_of_measurement: "bytes"
+    state_class: measurement
+    icon: mdi:memory
+    
+  - name: "Greenhouse Soil 2 Device Temperature"
+    state_topic: "greenhouse/soil2/diagnostics"
+    value_template: "{{ value_json.temperature }}"
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+
+# ============== BINARY SENSORS ==============
+binary_sensor:
+  # Climate Devices
+  - name: "Greenhouse Climate 1 Status"
+    state_topic: "greenhouse/climate1/status"
+    payload_on: "online"
+    payload_off: "offline"
+    device_class: connectivity
+    
+  - name: "Greenhouse Climate 2 Status"
+    state_topic: "greenhouse/climate2/status"
+    payload_on: "online"
+    payload_off: "offline"
+    device_class: connectivity
+
+  # Soil Monitor 2 (Battery)
+  - name: "Greenhouse Soil 2 Status"
+    state_topic: "greenhouse/soil2/status"
+    payload_on: "online"
+    payload_off: "offline"
+    device_class: connectivity
+
+# ============== SWITCHES ==============
+switch:
+  # Climate Devices OTA
+  - name: "Greenhouse Climate 1 OTA Mode"
+    state_topic: "greenhouse/climate1/ota_mode"
+    command_topic: "greenhouse/climate1/ota_mode/set"
+    payload_on: "ON"
+    payload_off: "OFF"
+    icon: mdi:upload-network
+
+  - name: "Greenhouse Climate 2 OTA Mode"
+    state_topic: "greenhouse/climate2/ota_mode"
+    command_topic: "greenhouse/climate2/ota_mode/set"
+    payload_on: "ON"
+    payload_off: "OFF"
+    icon: mdi:upload-network
+
+  # Soil Monitor 2 OTA (Battery device with deep sleep)
+  - name: "Greenhouse Soil 2 OTA Mode"
+    state_topic: "greenhouse/soil2/ota_mode/state"
+    command_topic: "greenhouse/soil2/ota_mode/set"
+    payload_on: "ON"
+    payload_off: "OFF"
+    optimistic: false
+    retain: true
+    icon: mdi:upload-network
+    device_class: switch

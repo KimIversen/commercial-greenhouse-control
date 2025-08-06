@@ -1,0 +1,207 @@
+# Sensor Configuration for Greenhouse Control System
+# This file contains all sensors: command_line, SQL, and template sensors
+
+# System monitoring sensors via command line
+sensor:
+  - platform: command_line
+    name: "CPU Usage"
+    command: "top -bn1 | grep 'Cpu(s)' | awk '{print $2}' | sed 's/%us,//'"
+    unit_of_measurement: "%"
+    scan_interval: 60
+    
+  - platform: command_line
+    name: "Memory Usage"
+    command: "free | grep Mem | awk '{printf \"%.1f\", $3/$2 * 100.0}'"
+    unit_of_measurement: "%"
+    scan_interval: 60
+    
+  - platform: command_line
+    name: "Disk Usage"
+    command: "df -h / | awk 'NR==2{printf \"%s\", $5}' | sed 's/%//'"
+    unit_of_measurement: "%"
+    scan_interval: 60
+
+  # Database monitoring
+  - platform: sql
+    db_url: !secret db_url
+    queries:
+      - name: "Database Size"
+        query: "SELECT ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS size_mb FROM information_schema.tables WHERE table_schema = 'homeassistant';"
+        column: 'size_mb'
+        unit_of_measurement: 'MB'
+        
+      - name: "Recorder Events"
+        query: "SELECT COUNT(*) FROM events WHERE created > DATE_SUB(NOW(), INTERVAL 24 HOUR);"
+        column: 'COUNT(*)'
+        unit_of_measurement: 'events'
+        
+      - name: "Recorder States"
+        query: "SELECT COUNT(*) FROM states WHERE created > DATE_SUB(NOW(), INTERVAL 24 HOUR);"
+        column: 'COUNT(*)'
+        unit_of_measurement: 'states'
+
+# Template sensors for calculated values
+template:
+  - sensor:
+      # ============== SOIL MONITOR 2 BATTERY CALCULATIONS ==============
+      # Battery discharge rate
+      - name: "Greenhouse Soil 2 Battery Discharge Rate"
+        unique_id: greenhouse_soil_2_battery_discharge_rate
+        unit_of_measurement: "%/day"
+        state: >
+          {% set battery = states('sensor.greenhouse_soil_2_battery_level') | float(100) %}
+          {% set prev_battery = state_attr('sensor.greenhouse_soil_2_battery_level', 'last_changed') %}
+          {% if prev_battery %}
+            {% set hours_elapsed = (now() - prev_battery).total_seconds() / 3600 %}
+            {% if hours_elapsed > 0 %}
+              {{ ((100 - battery) / hours_elapsed * 24) | round(1) }}
+            {% else %}
+              0
+            {% endif %}
+          {% else %}
+            unknown
+          {% endif %}
+        icon: mdi:battery-minus
+
+      # Estimated days remaining
+      - name: "Greenhouse Soil 2 Battery Days Remaining"
+        unique_id: greenhouse_soil_2_battery_days_remaining
+        unit_of_measurement: "days"
+        state: >
+          {% set battery = states('sensor.greenhouse_soil_2_battery_level') | float(0) %}
+          {% set discharge_rate = states('sensor.greenhouse_soil_2_battery_discharge_rate') | float(2.5) %}
+          {% if discharge_rate > 0 %}
+            {{ (battery / discharge_rate) | round(1) }}
+          {% else %}
+            unknown
+          {% endif %}
+        icon: mdi:calendar-clock
+
+      # Sleep status based on last update time
+      - name: "Greenhouse Soil 2 Sleep Status"
+        unique_id: greenhouse_soil_2_sleep_status
+        state: >
+          {% set last_update = states.sensor.greenhouse_soil_2_battery_voltage.last_changed %}
+          {% if last_update %}
+            {% set minutes_ago = ((now() - last_update).total_seconds() / 60) | int %}
+            {% if is_state('switch.greenhouse_soil_2_ota_mode', 'on') %}
+              OTA Mode Active
+            {% elif minutes_ago < 2 %}
+              Awake
+            {% elif minutes_ago < 20 %}
+              Sleeping
+            {% else %}
+              Offline
+            {% endif %}
+          {% else %}
+            Unknown
+          {% endif %}
+        icon: >
+          {% if is_state('sensor.greenhouse_soil_2_sleep_status', 'OTA Mode Active') %}
+            mdi:upload-network
+          {% elif is_state('sensor.greenhouse_soil_2_sleep_status', 'Awake') %}
+            mdi:eye
+          {% elif is_state('sensor.greenhouse_soil_2_sleep_status', 'Sleeping') %}
+            mdi:sleep
+          {% else %}
+            mdi:alert-circle
+          {% endif %}
+
+      # Days since last charge
+      - name: "Greenhouse Soil 2 Days Since Charge"
+        unique_id: greenhouse_soil_2_days_since_charge
+        unit_of_measurement: "days"
+        state: >
+          {% set last_charge = states('input_datetime.soil_monitor_2_last_charge') %}
+          {% if last_charge not in ['unknown', 'unavailable'] %}
+            {{ ((now() - as_datetime(last_charge)).days) }}
+          {% else %}
+            unknown
+          {% endif %}
+        icon: mdi:calendar-clock
+
+  - binary_sensor:
+      # ============== BATTERY ALERTS ==============
+      # Low battery warning
+      - name: "Greenhouse Soil 2 Low Battery"
+        unique_id: greenhouse_soil_2_low_battery
+        state: >
+          {{ states('sensor.greenhouse_soil_2_battery_level') | float(100) < 20 }}
+        device_class: battery
+        
+      # Critical battery warning
+      - name: "Greenhouse Soil 2 Critical Battery"
+        unique_id: greenhouse_soil_2_critical_battery
+        state: >
+          {{ states('sensor.greenhouse_soil_2_battery_level') | float(100) < 10 }}
+        device_class: battery
+        attributes:
+          severity: critical
+
+      # Device overheating based on internal temperature
+      - name: "Greenhouse Soil 2 Overheating"
+        unique_id: greenhouse_soil_2_overheating
+        state: >
+          {{ states('sensor.greenhouse_soil_2_device_temperature') | float(0) > 70 }}
+        device_class: heat
+
+      # Extended offline alert
+      - name: "Greenhouse Soil 2 Extended Offline"
+        unique_id: greenhouse_soil_2_extended_offline
+        state: >
+          {% set last_update = states.sensor.greenhouse_soil_2_battery_voltage.last_changed %}
+          {% if last_update %}
+            {% set minutes_ago = ((now() - last_update).total_seconds() / 60) | int %}
+            {{ minutes_ago > 30 }}
+          {% else %}
+            false
+          {% endif %}
+        device_class: problem
+
+# Binary sensors for Docker containers
+binary_sensor:
+  - platform: command_line
+    name: "HomeAssistant Container"
+    command: 'docker ps --format "table {{.Names}}\t{{.Status}}" | grep homeassistant | grep -q "Up"'
+    device_class: running
+    scan_interval: 60
+    
+  - platform: command_line
+    name: "MariaDB Container"
+    command: 'docker ps --format "table {{.Names}}\t{{.Status}}" | grep mariadb | grep -q "Up"'
+    device_class: running
+    scan_interval: 60
+    
+  - platform: command_line
+    name: "Mosquitto Container"
+    command: 'docker ps --format "table {{.Names}}\t{{.Status}}" | grep mosquitto | grep -q "Up"'
+    device_class: running
+    scan_interval: 60
+    
+  - platform: command_line
+    name: "ESPHome Container"
+    command: 'docker ps --format "table {{.Names}}\t{{.Status}}" | grep esphome | grep -q "Up"'
+    device_class: running
+    scan_interval: 60
+
+# Input helpers for battery management
+input_boolean:
+  soil_monitor_2_battery_charged:
+    name: Soil Monitor 2 Battery Charged
+    icon: mdi:battery-charging-100
+
+input_datetime:
+  soil_monitor_2_last_charge:
+    name: Soil Monitor 2 Last Charge Date
+    has_date: true
+    has_time: true
+
+# Input buttons for manual actions
+input_button:
+  restart_homeassistant:
+    name: "Restart Home Assistant"
+    icon: mdi:restart
+    
+  manual_backup:
+    name: "Manual Backup"
+    icon: mdi:content-save

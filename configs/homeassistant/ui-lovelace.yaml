@@ -21,8 +21,8 @@ views:
             icon: mdi:water-percent
           - type: entity
             entity: sensor.greenhouse_soil_2_average_vwc
-            name: Soil Zone 2
-            icon: mdi:water-percent
+            name: Soil Zone 2 (Battery)
+            icon: mdi:battery-70
 
       # Environmental Conditions
       - type: entities
@@ -42,36 +42,27 @@ views:
             name: Soil Moisture Zone 1
           - entity: sensor.greenhouse_soil_2_average_vwc
             name: Soil Moisture Zone 2
+          - entity: sensor.greenhouse_soil_2_battery_level
+            name: Zone 2 Battery Level
 
       # Quick Actions
       - type: entities
-        title: Quick Actions
+        title: Device Controls
         show_header_toggle: false
         entities:
           - entity: switch.greenhouse_climate_1_ota_mode
             name: Climate 1 OTA Mode
           - entity: switch.greenhouse_climate_2_ota_mode
             name: Climate 2 OTA Mode
+          - entity: switch.greenhouse_soil_2_ota_mode
+            name: Soil 2 OTA Mode
+          - entity: sensor.greenhouse_soil_2_sleep_status
+            name: Soil 2 Status
 
   - title: Climate
     path: climate
     icon: mdi:thermometer-lines
     cards:
-      # Weather Forecast
-      - type: weather-forecast
-        entity: weather.forecast_hjem
-        name: "Local Weather Forecast"
-        show_current: true
-        show_forecast: true
-        forecast_type: daily
-
-      - type: weather-forecast
-        entity: weather.forecast_hjem
-        name: "Local Weather Forecast"
-        show_current: true
-        show_forecast: true
-        forecast_type: hourly
-
       # Temperature Overview
       - type: custom:mini-graph-card
         entities:
@@ -161,7 +152,7 @@ views:
           - entity: sensor.greenhouse_climate_2_wifi_signal
             name: Zone 2 WiFi Signal
 
-  - title: Soil Moisture
+  - title: Soil Monitoring
     path: soil
     icon: mdi:water-percent
     cards:
@@ -169,9 +160,9 @@ views:
       - type: custom:mini-graph-card
         entities:
           - entity: sensor.greenhouse_soil_1_average_vwc
-            name: Zone 1 Average
+            name: Zone 1 (3 sensors)
           - entity: sensor.greenhouse_soil_2_average_vwc
-            name: Zone 2 Average
+            name: Zone 2 (2 sensors, battery)
         name: Soil Moisture Trends
         hours_to_show: 48
         points_per_hour: 1
@@ -188,9 +179,9 @@ views:
           - value: 60
             color: "#27ae60"
 
-      # Zone 1 Detailed View
+      # Zone 1 Detailed View (3 sensors)
       - type: entities
-        title: Soil Zone 1 - Individual Sensors
+        title: Soil Zone 1 - Individual Sensors (Powered)
         show_header_toggle: false
         entities:
           - entity: sensor.greenhouse_soil_1_1_vwc
@@ -203,20 +194,31 @@ views:
           - entity: sensor.greenhouse_soil_1_average_vwc
             name: Zone 1 Average
 
-      # Zone 2 Detailed View
+      # Zone 2 Detailed View (2 sensors + battery)
       - type: entities
-        title: Soil Zone 2 - Individual Sensors
+        title: Soil Zone 2 - Battery Powered Monitor
         show_header_toggle: false
         entities:
-          - entity: sensor.greenhouse_soil_2_1_vwc
-            name: Sensor 2.1
-          - entity: sensor.greenhouse_soil_2_2_vwc
-            name: Sensor 2.2
-          - entity: sensor.greenhouse_soil_2_3_vwc
-            name: Sensor 2.3
+          - entity: sensor.greenhouse_soil_2_vwc_sensor_1
+            name: Soil Sensor 1
+          - entity: sensor.greenhouse_soil_2_vwc_sensor_2
+            name: Soil Sensor 2
           - type: divider
           - entity: sensor.greenhouse_soil_2_average_vwc
             name: Zone 2 Average
+          - type: divider
+          - entity: sensor.greenhouse_soil_2_temperature_1
+            name: Soil Temperature 1
+          - entity: sensor.greenhouse_soil_2_temperature_2
+            name: Soil Temperature 2
+          - entity: sensor.greenhouse_soil_2_air_temperature_1
+            name: Air Temperature 1
+          - entity: sensor.greenhouse_soil_2_air_temperature_2
+            name: Air Temperature 2
+          - entity: sensor.greenhouse_soil_2_air_humidity_1
+            name: Air Humidity 1
+          - entity: sensor.greenhouse_soil_2_air_humidity_2
+            name: Air Humidity 2
 
       # Moisture Status Gauges
       - type: horizontal-stack
@@ -257,128 +259,231 @@ views:
         line_width: 2
         animate: true
 
-      # Individual Sensor Trends - Zone 2
+      # Individual Sensor Trends - Zone 2 (Battery)
       - type: custom:mini-graph-card
         entities:
-          - entity: sensor.greenhouse_soil_2_1_vwc
-            name: Sensor 2.1
-          - entity: sensor.greenhouse_soil_2_2_vwc
-            name: Sensor 2.2
-          - entity: sensor.greenhouse_soil_2_3_vwc
-            name: Sensor 2.3
-        name: Zone 2 - Individual Sensor Trends  
+          - entity: sensor.greenhouse_soil_2_vwc_sensor_1
+            name: Soil Sensor 1
+          - entity: sensor.greenhouse_soil_2_vwc_sensor_2
+            name: Soil Sensor 2
+        name: Zone 2 - Soil Moisture Trends (Battery)
         hours_to_show: 24
         points_per_hour: 2
         line_width: 2
         animate: true
 
-  - title: Fertigation
-    path: fertigation
-    icon: mdi:water-pump
+  - title: Battery Monitor
+    path: battery
+    icon: mdi:battery
     cards:
-      # Tank Levels Overview
+      # Device Header with Status
+      - type: custom:button-card
+        entity: binary_sensor.greenhouse_soil_2_status
+        name: Soil Monitor 2 (Battery Powered)
+        icon: mdi:flower
+        show_state: true
+        styles:
+          card:
+            - background: >
+                [[[ 
+                  if (entity.state === 'on') return 'linear-gradient(90deg, #28a745, #20c997)';
+                  else return 'linear-gradient(90deg, #dc3545, #fd7e14)';
+                ]]]
+            - color: white
+            - font-weight: bold
+            - padding: 15px
+          icon:
+            - color: white
+            - width: 40px
+          name:
+            - font-size: 18px
+          state:
+            - font-size: 14px
+        state_display: >
+          [[[
+            if (entity.state === 'on') return 'Online';
+            else return 'Offline';
+          ]]]
+
+      # Battery and Power Management
       - type: horizontal-stack
         cards:
           - type: gauge
-            entity: sensor.fresh_water_tank_percent
-            name: Fresh Water
-            min: 0
-            max: 100
+            entity: sensor.greenhouse_soil_2_battery_level
+            name: Battery
+            needle: true
             severity:
               green: 40
               yellow: 20
               red: 10
-          - type: gauge
-            entity: sensor.fertilizer_a_tank_percent
-            name: Fertilizer A
             min: 0
             max: 100
-            severity:
-              green: 40
-              yellow: 20
-              red: 10
-          - type: gauge
-            entity: sensor.fertilizer_b_tank_percent
-            name: Fertilizer B
-            min: 0
-            max: 100
-            severity:
-              green: 40
-              yellow: 20
-              red: 10
-          - type: gauge
-            entity: sensor.mixed_tank_percent
-            name: Mixed Solution
-            min: 0
-            max: 100
-            severity:
-              green: 30
-              yellow: 15
-              red: 5
+            unit: '%'
+            
+          - type: entities
+            entities:
+              - entity: sensor.greenhouse_soil_2_battery_voltage
+                name: Voltage
+                icon: mdi:flash
+              - entity: sensor.greenhouse_soil_2_battery_days_remaining
+                name: Est. Days Left
+                icon: mdi:battery-clock
+              - entity: sensor.greenhouse_soil_2_sleep_status
+                name: Sleep Status
+                icon: mdi:power-sleep
 
-      # Tank Volume Details
+      # OTA and Device Controls
       - type: entities
-        title: Tank Volumes
+        title: Device Controls
         show_header_toggle: false
         entities:
-          - entity: sensor.fresh_water_volume
-            name: Fresh Water Tank
-          - entity: sensor.fertilizer_a_volume
-            name: Fertilizer A Tank
-          - entity: sensor.fertilizer_b_volume
-            name: Fertilizer B Tank
-          - entity: sensor.mixed_tank_volume
-            name: Mixed Solution Tank
+          - entity: switch.greenhouse_soil_2_ota_mode
+            name: OTA Mode
+            secondary_info: When ON, device stays awake for updates
+          - type: divider
+          - entity: script.soil2_enable_ota
+            name: Wake for Update
+            icon: mdi:upload
+          - entity: script.soil2_disable_ota
+            name: Force Sleep
+            icon: mdi:sleep
+          - entity: script.soil2_mark_battery_charged
+            name: Mark Battery Charged
+            icon: mdi:battery-charging
+          - entity: script.soil2_battery_health_check
+            name: Battery Health Check
+            icon: mdi:battery-heart
 
-      # System Status
-      - type: entities
-        title: System Status
-        show_header_toggle: false
-        entities:
-          - entity: binary_sensor.system_ready
-            name: System Ready
-          - entity: binary_sensor.low_water_alert
-            name: Low Water Alert
-          - entity: binary_sensor.low_fertilizer_alert
-            name: Low Fertilizer Alert
-          - entity: binary_sensor.ratio_deviation_alert
-            name: Ratio Deviation Alert
+      # Environmental Readings from Zone 2
+      - type: grid
+        columns: 2
+        cards:
+          # Soil Moisture
+          - type: custom:mini-graph-card
+            name: Soil Moisture
+            entities:
+              - entity: sensor.greenhouse_soil_2_vwc_sensor_1
+                name: Sensor 1
+                color: '#2196f3'
+              - entity: sensor.greenhouse_soil_2_vwc_sensor_2
+                name: Sensor 2
+                color: '#4caf50'
+              - entity: sensor.greenhouse_soil_2_average_vwc
+                name: Average
+                color: '#ff9800'
+                show_fill: false
+            hours_to_show: 24
+            points_per_hour: 4
+            line_width: 2
+            show:
+              labels: true
+              legend: true
 
-      # Valve Controls
-      - type: entities
-        title: Valve Controls
-        show_header_toggle: false
-        entities:
-          - entity: switch.valve_fresh_water
-            name: Fresh Water Valve
-          - entity: switch.valve_venturi_line
-            name: Venturi Line Valve
-          - entity: switch.valve_mixed_tank
-            name: Mixed Tank Valve
-          - entity: switch.valve_irrigation
-            name: Irrigation Valve
+          # Temperature Readings
+          - type: custom:mini-graph-card
+            name: Temperature
+            entities:
+              - entity: sensor.greenhouse_soil_2_temperature_1
+                name: Soil 1
+                color: '#8b4513'
+              - entity: sensor.greenhouse_soil_2_temperature_2
+                name: Soil 2
+                color: '#a0522d'
+              - entity: sensor.greenhouse_soil_2_air_temperature_1
+                name: Air 1
+                color: '#87ceeb'
+              - entity: sensor.greenhouse_soil_2_air_temperature_2
+                name: Air 2
+                color: '#4682b4'
+            hours_to_show: 24
+            points_per_hour: 4
+            line_width: 2
+            show:
+              labels: true
+              legend: true
 
-      # Flow Monitoring
-      - type: entities
-        title: Flow Monitoring
-        show_header_toggle: false
+          # Humidity Readings
+          - type: custom:mini-graph-card
+            name: Humidity
+            entities:
+              - entity: sensor.greenhouse_soil_2_air_humidity_1
+                name: Sensor 1
+                color: '#00bcd4'
+              - entity: sensor.greenhouse_soil_2_air_humidity_2
+                name: Sensor 2
+                color: '#009688'
+            hours_to_show: 24
+            points_per_hour: 4
+            line_width: 2
+            show:
+              labels: true
+              legend: true
+            unit: '%'
+
+          # Device Health
+          - type: entities
+            title: Device Health
+            entities:
+              - entity: sensor.greenhouse_soil_2_wifi_rssi
+                name: WiFi Signal
+                icon: mdi:wifi
+              - entity: sensor.greenhouse_soil_2_device_temperature
+                name: CPU Temp
+                icon: mdi:thermometer
+              - entity: sensor.greenhouse_soil_2_uptime
+                name: Uptime
+                icon: mdi:clock-outline
+              - entity: sensor.greenhouse_soil_2_free_heap
+                name: Free Memory
+                icon: mdi:memory
+
+      # Battery History
+      - type: custom:mini-graph-card
+        name: Battery History (7 days)
         entities:
-          - entity: sensor.water_flow_rate
-            name: Water Flow Rate
-          - entity: sensor.fertilizer_a_flow_rate
-            name: Fertilizer A Flow Rate
-          - entity: sensor.fertilizer_b_flow_rate
-            name: Fertilizer B Flow Rate
-          - entity: sensor.fertilizer_a_ratio_deviation
-            name: A Ratio Deviation
-          - entity: sensor.fertilizer_b_ratio_deviation
-            name: B Ratio Deviation
+          - entity: sensor.greenhouse_soil_2_battery_level
+            name: Battery Level
+            color: >
+              [[[
+                const level = states['sensor.greenhouse_soil_2_battery_level'].state;
+                if (level > 40) return '#4caf50';
+                else if (level > 20) return '#ff9800';
+                else return '#f44336';
+              ]]]
+        hours_to_show: 168
+        points_per_hour: 0.25
+        line_width: 2
+        show:
+          labels: true
+          points: false
+          average: true
+          extrema: true
+
+      # Battery Alerts
+      - type: conditional
+        conditions:
+          - entity: binary_sensor.greenhouse_soil_2_low_battery
+            state: 'on'
+        card:
+          type: custom:button-card
+          name: Low Battery Warning
+          icon: mdi:battery-alert
+          styles:
+            card:
+              - background: '#ff9800'
+              - color: white
+              - padding: 10px
+            icon:
+              - color: white
+          tap_action:
+            action: call-service
+            service: script.soil2_mark_battery_charged
 
   - title: System Health
     path: system
     icon: mdi:monitor-dashboard
     cards:
-      # Device Connectivity (existing sensors)
+      # Device Connectivity
       - type: entities
         title: Device Connectivity
         show_header_toggle: false
@@ -387,10 +492,15 @@ views:
             name: Climate Zone 1
           - entity: binary_sensor.greenhouse_climate_2_status
             name: Climate Zone 2
+          - entity: binary_sensor.greenhouse_soil_2_status
+            name: Soil Zone 2 (Battery)
+          - type: divider
           - entity: sensor.greenhouse_climate_1_wifi_signal
             name: Climate 1 WiFi Signal
           - entity: sensor.greenhouse_climate_2_wifi_signal
             name: Climate 2 WiFi Signal
+          - entity: sensor.greenhouse_soil_2_wifi_rssi
+            name: Soil 2 WiFi Signal
 
       # System Resources 
       - type: entities
@@ -444,6 +554,12 @@ views:
             name: Climate 1 OTA Mode
           - entity: switch.greenhouse_climate_2_ota_mode
             name: Climate 2 OTA Mode
+          - entity: switch.greenhouse_soil_2_ota_mode
+            name: Soil 2 OTA Mode
+          - type: divider
+          - entity: script.greenhouse_system_health
+            name: System Health Check
+            icon: mdi:heart-pulse
 
   - title: History
     path: history
@@ -453,9 +569,13 @@ views:
       - type: custom:mini-graph-card
         entities:
           - entity: sensor.greenhouse_climate_1_temperature
-            name: Zone 1 Temp
+            name: Zone 1 Climate
           - entity: sensor.greenhouse_climate_2_temperature
-            name: Zone 2 Temp
+            name: Zone 2 Climate
+          - entity: sensor.greenhouse_soil_2_air_temperature_1
+            name: Zone 2 Air Temp 1
+          - entity: sensor.greenhouse_soil_2_air_temperature_2
+            name: Zone 2 Air Temp 2
         name: Temperature History (7 Days)
         hours_to_show: 168
         points_per_hour: 0.25
@@ -469,9 +589,13 @@ views:
       - type: custom:mini-graph-card
         entities:
           - entity: sensor.greenhouse_climate_1_humidity
-            name: Zone 1 Humidity
+            name: Zone 1 Climate
           - entity: sensor.greenhouse_climate_2_humidity
-            name: Zone 2 Humidity
+            name: Zone 2 Climate
+          - entity: sensor.greenhouse_soil_2_air_humidity_1
+            name: Zone 2 Air Hum 1
+          - entity: sensor.greenhouse_soil_2_air_humidity_2
+            name: Zone 2 Air Hum 2
         name: Humidity History (7 Days)
         hours_to_show: 168
         points_per_hour: 0.25
@@ -485,9 +609,9 @@ views:
       - type: custom:mini-graph-card
         entities:
           - entity: sensor.greenhouse_soil_1_average_vwc
-            name: Zone 1 Soil
+            name: Zone 1 Soil (Powered)
           - entity: sensor.greenhouse_soil_2_average_vwc
-            name: Zone 2 Soil
+            name: Zone 2 Soil (Battery)
         name: Soil Moisture History (14 Days)
         hours_to_show: 336
         points_per_hour: 0.125
@@ -504,17 +628,42 @@ views:
           - value: 60
             color: "#27ae60"
 
-      # Tank Level History
+      # Soil Temperature History
       - type: custom:mini-graph-card
         entities:
-          - entity: sensor.fresh_water_tank_percent
-            name: Fresh Water
-          - entity: sensor.mixed_tank_percent
-            name: Mixed Solution
-        name: Tank Level History (7 Days)
+          - entity: sensor.greenhouse_soil_2_temperature_1
+            name: Soil Temp 1
+          - entity: sensor.greenhouse_soil_2_temperature_2
+            name: Soil Temp 2
+        name: Soil Temperature History (7 Days)
         hours_to_show: 168
         points_per_hour: 0.25
         line_width: 2
         animate: false
         show:
           extrema: true
+          average: true
+
+      # Battery Level History
+      - type: custom:mini-graph-card
+        entities:
+          - entity: sensor.greenhouse_soil_2_battery_level
+            name: Battery Level
+          - entity: sensor.greenhouse_soil_2_battery_voltage
+            name: Battery Voltage
+            y_axis: secondary
+        name: Battery History (30 Days)
+        hours_to_show: 720
+        points_per_hour: 0.0625
+        line_width: 2
+        animate: false
+        show:
+          extrema: true
+          average: true
+        color_thresholds:
+          - value: 20
+            color: "#e74c3c"
+          - value: 40
+            color: "#f39c12"
+          - value: 80
+            color: "#27ae60"

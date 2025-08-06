@@ -27,122 +27,8 @@ recorder:
 # Cloud integration
 cloud:
 
-# MQTT configuration with auto-discovery disabled for ESPHome
-mqtt:
-  sensor:
-    # Device 1
-    - name: "Greenhouse Climate 1 Temperature"
-      state_topic: "greenhouse/climate1/temperature"
-      unit_of_measurement: "°C"
-      device_class: temperature
-      state_class: measurement
-      
-    - name: "Greenhouse Climate 1 Humidity"
-      state_topic: "greenhouse/climate1/humidity"
-      unit_of_measurement: "%"
-      device_class: humidity
-      state_class: measurement
-      
-    - name: "Greenhouse Climate 1 WiFi Signal"
-      state_topic: "greenhouse/climate1/wifi_signal"
-      unit_of_measurement: "dBm"
-      device_class: signal_strength
-      entity_category: diagnostic
-      
-    # Device 2 (when you add it)
-    - name: "Greenhouse Climate 2 Temperature"
-      state_topic: "greenhouse/climate2/temperature"
-      unit_of_measurement: "°C"
-      device_class: temperature
-      state_class: measurement
-      
-    - name: "Greenhouse Climate 2 Humidity"
-      state_topic: "greenhouse/climate2/humidity"
-      unit_of_measurement: "%"
-      device_class: humidity
-      state_class: measurement
-
-    - name: "Greenhouse Climate 2 WiFi Signal"
-      state_topic: "greenhouse/climate2/wifi_signal"
-      unit_of_measurement: "dBm"
-      device_class: signal_strength
-      entity_category: diagnostic
-
-    - name: "Greenhouse Soil 1.1 VWC"
-      state_topic: "greenhouse/soil1/sensor1_vwc"
-      unit_of_measurement: "%"
-      device_class: moisture
-      state_class: measurement
-      
-    - name: "Greenhouse Soil 1.2 VWC"
-      state_topic: "greenhouse/soil1/sensor2_vwc"
-      unit_of_measurement: "%"
-      device_class: moisture
-      state_class: measurement
-      
-    - name: "Greenhouse Soil 1.3 VWC"
-      state_topic: "greenhouse/soil1/sensor3_vwc"
-      unit_of_measurement: "%"
-      device_class: moisture
-      state_class: measurement
-      
-    - name: "Greenhouse Soil 1 Average VWC"
-      state_topic: "greenhouse/soil1/average_vwc"
-      unit_of_measurement: "%"
-      device_class: moisture
-      state_class: measurement
-
-    - name: "Greenhouse Soil 2.1 VWC"
-      state_topic: "greenhouse/soil2/sensor1_vwc"
-      unit_of_measurement: "%"
-      device_class: moisture
-      state_class: measurement
-      
-    - name: "Greenhouse Soil 2.2 VWC"
-      state_topic: "greenhouse/soil2/sensor2_vwc"
-      unit_of_measurement: "%"
-      device_class: moisture
-      state_class: measurement
-      
-    - name: "Greenhouse Soil 2.3 VWC"
-      state_topic: "greenhouse/soil2/sensor3_vwc"
-      unit_of_measurement: "%"
-      device_class: moisture
-      state_class: measurement
-
-    - name: "Greenhouse Soil 2 Average VWC"
-      state_topic: "greenhouse/soil2/average_vwc"
-      unit_of_measurement: "%"
-      device_class: moisture
-      state_class: measurement
-
-  binary_sensor:
-    - name: "Greenhouse Climate 1 Status"
-      state_topic: "greenhouse/climate1/status"
-      payload_on: "online"
-      payload_off: "offline"
-      device_class: connectivity
-      
-    - name: "Greenhouse Climate 2 Status"
-      state_topic: "greenhouse/climate2/status"
-      payload_on: "online"
-      payload_off: "offline"
-      device_class: connectivity
-
-  switch:
-    - name: "Greenhouse Climate 1 OTA Mode"
-      state_topic: "greenhouse/climate1/ota_mode"
-      command_topic: "greenhouse/climate1/ota_mode/set"
-      payload_on: "ON"
-      payload_off: "OFF"
-      icon: mdi:upload-network
-
-    - name: "Greenhouse Climate 2 OTA Mode"
-      state_topic: "greenhouse/climate2/ota_mode"
-      command_topic: "greenhouse/climate2/ota_mode/set"
-      payload_on: "ON"
-      payload_off: "OFF"
-      icon: mdi:upload-network
+# MQTT configuration - all sensors moved to mqtt.yaml
+mqtt: !include mqtt.yaml
 
 # Notifications
 notify:
@@ -176,49 +62,18 @@ lovelace:
     - url: /hacsfiles/button-card/button-card.js
       type: module
 
+# Include all configuration files
 automation: !include automations.yaml
-script:     !include scripts.yaml
-scene:      !include scenes.yaml
+script: !include scripts.yaml
+scene: !include scenes.yaml
 
-# System monitoring sensors
-sensor:
-  # System resource monitoring via command line
-  - platform: command_line
-    name: "CPU Usage"
-    command: "top -bn1 | grep 'Cpu(s)' | awk '{print $2}' | sed 's/%us,//'"
-    unit_of_measurement: "%"
-    scan_interval: 60
-    
-  - platform: command_line
-    name: "Memory Usage"
-    command: "free | grep Mem | awk '{printf \"%.1f\", $3/$2 * 100.0}'"
-    unit_of_measurement: "%"
-    scan_interval: 60
-    
-  - platform: command_line
-    name: "Disk Usage"
-    command: "df -h / | awk 'NR==2{printf \"%s\", $5}' | sed 's/%//'"
-    unit_of_measurement: "%"
-    scan_interval: 60
-
-  # Database monitoring
-  - platform: sql
-    db_url: !secret db_url
-    queries:
-      - name: "Database Size"
-        query: "SELECT ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS size_mb FROM information_schema.tables WHERE table_schema = 'homeassistant';"
-        column: 'size_mb'
-        unit_of_measurement: 'MB'
-        
-      - name: "Recorder Events"
-        query: "SELECT COUNT(*) FROM events WHERE created > DATE_SUB(NOW(), INTERVAL 24 HOUR);"
-        column: 'COUNT(*)'
-        unit_of_measurement: 'events'
-        
-      - name: "Recorder States"
-        query: "SELECT COUNT(*) FROM states WHERE created > DATE_SUB(NOW(), INTERVAL 24 HOUR);"
-        column: 'COUNT(*)'
-        unit_of_measurement: 'states'
+# All sensors (system monitoring, SQL, template) moved to sensors.yaml
+sensor: !include sensors.yaml
+binary_sensor: !include sensors.yaml
+template: !include sensors.yaml
+input_boolean: !include sensors.yaml
+input_datetime: !include sensors.yaml
+input_button: !include sensors.yaml
 
 # Shell commands for container monitoring and backup
 shell_command:
@@ -227,59 +82,6 @@ shell_command:
   check_mosquitto_container: 'docker ps --format "table {{.Names}}\t{{.Status}}" | grep mosquitto | grep -q "Up" && echo "online" || echo "offline"'
   check_esphome_container: 'docker ps --format "table {{.Names}}\t{{.Status}}" | grep esphome | grep -q "Up" && echo "online" || echo "offline"'
   manual_backup: "/config/scripts/backup.sh"
-
-# Binary sensors for Docker containers
-binary_sensor:
-  - platform: command_line
-    name: "HomeAssistant Container"
-    command: 'docker ps --format "table {{.Names}}\t{{.Status}}" | grep homeassistant | grep -q "Up"'
-    device_class: running
-    scan_interval: 60
-    
-  - platform: command_line
-    name: "MariaDB Container"
-    command: 'docker ps --format "table {{.Names}}\t{{.Status}}" | grep mariadb | grep -q "Up"'
-    device_class: running
-    scan_interval: 60
-    
-  - platform: command_line
-    name: "Mosquitto Container"
-    command: 'docker ps --format "table {{.Names}}\t{{.Status}}" | grep mosquitto | grep -q "Up"'
-    device_class: running
-    scan_interval: 60
-    
-  - platform: command_line
-    name: "ESPHome Container"
-    command: 'docker ps --format "table {{.Names}}\t{{.Status}}" | grep esphome | grep -q "Up"'
-    device_class: running
-    scan_interval: 60
-
-# Restart and backup automation
-automation manual_restart:
-  alias: "Manual Restart HomeAssistant"
-  trigger:
-    - platform: event
-      event_type: manual_restart_request
-  action:
-    - service: homeassistant.restart
-
-automation manual_backup:
-  alias: "Manual Backup"
-  trigger:
-    - platform: event
-      event_type: manual_backup_request
-  action:
-    - service: shell_command.manual_backup
-
-# Input buttons for manual actions
-input_button:
-  restart_homeassistant:
-    name: "Restart Home Assistant"
-    icon: mdi:restart
-    
-  manual_backup:
-    name: "Manual Backup"
-    icon: mdi:content-save
 
 
 # Zones

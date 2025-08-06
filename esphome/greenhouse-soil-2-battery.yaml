@@ -1,0 +1,643 @@
+substitutions:
+  device_number: "2"
+  device_ip: "192.168.10.153"
+  
+  # ADC pins on XIAO ESP32-C3
+  moisture_pin_1: "GPIO2"   # A0 - Soil sensor 1
+  moisture_pin_2: "GPIO3"   # A1 - Soil sensor 2
+  battery_pin: "GPIO4"      # A2 - Battery voltage monitoring
+  
+  # Digital sensor pins
+  dallas_pin: "GPIO5"        # DS18B20 temperature sensors
+  dht_pin_1: "GPIO6"         # DHT22 sensor 1
+  dht_pin_2: "GPIO7"         # DHT22 sensor 2
+  
+  # Deep sleep configuration
+  sleep_duration: "15min"   # Sleep for 15 minutes
+  awake_duration: "25s"      # Stay awake for 25 seconds (20s readings + 5s buffer)
+  
+  # Update intervals during awake period
+  sensor_update_interval: "1s"  # Take readings every second while awake
+
+esphome:
+  name: greenhouse-soil-${device_number}
+  friendly_name: Greenhouse Soil Monitor ${device_number}
+  comment: "Battery-powered soil/climate monitor with deep sleep"
+  on_boot:
+    priority: 600
+    then:
+      - logger.log: "Device booting up..."
+      - wait_until:
+          mqtt.connected:
+      - logger.log: "MQTT connected, checking OTA mode from retained message..."
+      - delay: 2s  # Give time for MQTT subscription to receive retained message
+      - if:
+          condition:
+            switch.is_on: ota_mode
+          then:
+            - logger.log: "OTA mode is ON - staying awake"
+            - deep_sleep.prevent: deep_sleep_controller
+          else:
+            - logger.log: "OTA mode is OFF - will enter deep sleep cycle"
+            - deep_sleep.allow: deep_sleep_controller
+
+esp32:
+  board: seeed_xiao_esp32c3
+  framework:
+    type: arduino
+
+logger:
+  level: INFO
+  logs:
+    sensor: WARN
+    mqtt: INFO
+    wifi: INFO
+    api: WARN
+    ota: INFO
+    deep_sleep: INFO
+
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+    on_begin:
+      then:
+        - logger.log: "OTA update starting..."
+        - switch.turn_on: ota_mode
+    on_end:
+      then:
+        - logger.log: "OTA update complete"
+    on_error:
+      then:
+        - logger.log: "OTA update failed"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  fast_connect: true
+  manual_ip:
+    static_ip: ${device_ip}
+    gateway: 192.168.10.1
+    subnet: 255.255.255.0
+    dns1: 192.168.10.1
+  ap:
+    ssid: "Soil-Monitor-${device_number}"
+    password: !secret fallback_password
+
+mqtt:
+  broker: !secret mqtt_broker
+  username: !secret mqtt_username
+  password: !secret mqtt_password
+  port: 1883
+  topic_prefix: greenhouse/soil${device_number}
+  birth_message:
+    topic: greenhouse/soil${device_number}/status
+    payload: online
+    retain: true
+  will_message:
+    topic: greenhouse/soil${device_number}/status
+    payload: offline
+    retain: true
+  on_message:
+    # Subscribe to OTA mode command with retained message
+    - topic: greenhouse/soil${device_number}/ota_mode/set
+      payload: "ON"
+      qos: 1
+      then:
+        - switch.turn_on: ota_mode
+        - logger.log: "OTA mode enabled via MQTT retained message"
+    - topic: greenhouse/soil${device_number}/ota_mode/set
+      payload: "OFF"
+      qos: 1
+      then:
+        - switch.turn_off: ota_mode
+        - logger.log: "OTA mode disabled via MQTT retained message"
+
+web_server:
+  port: 80
+
+time:
+  - platform: sntp
+    id: sntp_time
+    timezone: "Europe/Oslo"
+    servers:
+      - pool.ntp.org
+      - time.google.com
+    on_time_sync:
+      then:
+        - logger.log: "Time synchronized"
+
+# Deep sleep configuration
+deep_sleep:
+  id: deep_sleep_controller
+  run_duration: ${awake_duration}
+  sleep_duration: ${sleep_duration}
+
+# Dallas DS18B20 temperature sensors
+dallas:
+  - pin: ${dallas_pin}
+    update_interval: ${sensor_update_interval}
+
+# Global variables for averaging
+globals:
+  - id: reading_count
+    type: int
+    restore_value: no
+    initial_value: '0'
+  - id: soil1_sum
+    type: float
+    restore_value: no
+    initial_value: '0.0'
+  - id: soil2_sum
+    type: float
+    restore_value: no
+    initial_value: '0.0'
+  - id: temp1_sum
+    type: float
+    restore_value: no
+    initial_value: '0.0'
+  - id: temp2_sum
+    type: float
+    restore_value: no
+    initial_value: '0.0'
+  - id: humidity1_sum
+    type: float
+    restore_value: no
+    initial_value: '0.0'
+  - id: humidity2_sum
+    type: float
+    restore_value: no
+    initial_value: '0.0'
+
+sensor:
+  # -------- Battery Monitoring --------
+  - platform: adc
+    pin: ${battery_pin}
+    name: "Battery Voltage"
+    id: battery_voltage
+    attenuation: 11dB
+    filters:
+      - multiply: 2.0  # Adjust based on your voltage divider (220k resistors)
+      - sliding_window_moving_average:
+          window_size: 5
+          send_every: 1
+    update_interval: 5s  # Check battery less frequently
+    accuracy_decimals: 2
+    unit_of_measurement: "V"
+    device_class: voltage
+    entity_category: diagnostic
+    on_value:
+      - mqtt.publish:
+          topic: greenhouse/soil${device_number}/battery_voltage
+          payload: !lambda 'return to_string(x);'
+          retain: true
+
+  - platform: template
+    name: "Battery Level"
+    id: battery_level
+    lambda: |-
+      float voltage = id(battery_voltage).state;
+      // Li-ion: 4.2V = 100%, 3.0V = 0%
+      if (voltage >= 4.2) return 100.0;
+      if (voltage <= 3.0) return 0.0;
+      return ((voltage - 3.0) / 1.2) * 100.0;
+    update_interval: 5s
+    unit_of_measurement: "%"
+    device_class: battery
+    accuracy_decimals: 0
+    entity_category: diagnostic
+    on_value:
+      - mqtt.publish:
+          topic: greenhouse/soil${device_number}/battery_level
+          payload: !lambda 'return to_string(x);'
+          retain: true
+
+  # -------- Soil Moisture Sensors (RAW ADC) --------
+  - platform: adc
+    id: s1_raw
+    pin: ${moisture_pin_1}
+    raw: true
+    attenuation: 12db
+    update_interval: ${sensor_update_interval}
+    internal: true
+
+  - platform: adc
+    id: s2_raw
+    pin: ${moisture_pin_2}
+    raw: true
+    attenuation: 12db
+    update_interval: ${sensor_update_interval}
+    internal: true
+
+  # -------- Soil VWC Calculations --------
+  - platform: template
+    name: "Soil VWC Sensor 1"
+    id: soil_vwc_1
+    unit_of_measurement: "% VWC"
+    device_class: moisture
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: ${sensor_update_interval}
+    lambda: |-
+      return id(s1_raw).state;
+    filters:
+      - calibrate_linear:
+          - 1345 -> 51.0
+          - 1396 -> 45.0
+          - 1556 -> 30.0
+          - 3408 -> 0.0
+      - lambda: |-
+          if (x < 0.0f) x = 0.0f;
+          if (x > 60.0f) x = 60.0f;
+          id(soil1_sum) += x;
+          return x;
+    on_value:
+      - mqtt.publish:
+          topic: greenhouse/soil${device_number}/sensor1_vwc
+          payload: !lambda 'return to_string(x);'
+          retain: true
+
+  - platform: template
+    name: "Soil VWC Sensor 2"
+    id: soil_vwc_2
+    unit_of_measurement: "% VWC"
+    device_class: moisture
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: ${sensor_update_interval}
+    lambda: |-
+      return id(s2_raw).state;
+    filters:
+      - calibrate_linear:
+          - 1381 -> 51.0
+          - 1454 -> 45.0
+          - 1881 -> 30.0
+          - 3457 -> 0.0
+      - lambda: |-
+          if (x < 0.0f) x = 0.0f;
+          if (x > 60.0f) x = 60.0f;
+          id(soil2_sum) += x;
+          return x;
+    on_value:
+      - mqtt.publish:
+          topic: greenhouse/soil${device_number}/sensor2_vwc
+          payload: !lambda 'return to_string(x);'
+          retain: true
+
+  # -------- Average Soil VWC --------
+  - platform: template
+    name: "Average Soil VWC"
+    id: soil_vwc_average
+    unit_of_measurement: "% VWC"
+    device_class: moisture
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: ${sensor_update_interval}
+    lambda: |-
+      float s1 = id(soil_vwc_1).state;
+      float s2 = id(soil_vwc_2).state;
+      int n = 0;
+      float sum = 0.0f;
+      if (!isnan(s1)) { sum += s1; n++; }
+      if (!isnan(s2)) { sum += s2; n++; }
+      return n > 0 ? sum / n : NAN;
+    on_value:
+      - mqtt.publish:
+          topic: greenhouse/soil${device_number}/average_vwc
+          payload: !lambda 'return to_string(x);'
+          retain: true
+
+  # -------- DS18B20 Temperature Sensors --------
+  - platform: dallas
+    address: 0x0000000000000000  # Replace with actual address after discovery
+    name: "Soil Temperature 1"
+    id: soil_temp_1
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    filters:
+      - lambda: |-
+          id(temp1_sum) += x;
+          return x;
+    on_value:
+      - mqtt.publish:
+          topic: greenhouse/soil${device_number}/soil_temp_1
+          payload: !lambda 'return to_string(x);'
+          retain: true
+
+  - platform: dallas
+    address: 0x0000000000000001  # Replace with actual address after discovery
+    name: "Soil Temperature 2"
+    id: soil_temp_2
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    filters:
+      - lambda: |-
+          id(temp2_sum) += x;
+          return x;
+    on_value:
+      - mqtt.publish:
+          topic: greenhouse/soil${device_number}/soil_temp_2
+          payload: !lambda 'return to_string(x);'
+          retain: true
+
+  # -------- DHT22 Sensors --------
+  - platform: dht
+    pin: ${dht_pin_1}
+    model: DHT22
+    temperature:
+      name: "Air Temperature 1"
+      id: air_temp_1
+      filters:
+        - lambda: |-
+            id(temp1_sum) += x;
+            return x;
+      on_value:
+        - mqtt.publish:
+            topic: greenhouse/soil${device_number}/air_temp_1
+            payload: !lambda 'return to_string(x);'
+            retain: true
+    humidity:
+      name: "Air Humidity 1"
+      id: air_humidity_1
+      filters:
+        - lambda: |-
+            id(humidity1_sum) += x;
+            return x;
+      on_value:
+        - mqtt.publish:
+            topic: greenhouse/soil${device_number}/air_humidity_1
+            payload: !lambda 'return to_string(x);'
+            retain: true
+    update_interval: ${sensor_update_interval}
+
+  - platform: dht
+    pin: ${dht_pin_2}
+    model: DHT22
+    temperature:
+      name: "Air Temperature 2"
+      id: air_temp_2
+      filters:
+        - lambda: |-
+            id(temp2_sum) += x;
+            return x;
+      on_value:
+        - mqtt.publish:
+            topic: greenhouse/soil${device_number}/air_temp_2
+            payload: !lambda 'return to_string(x);'
+            retain: true
+    humidity:
+      name: "Air Humidity 2"
+      id: air_humidity_2
+      filters:
+        - lambda: |-
+            id(humidity2_sum) += x;
+            return x;
+      on_value:
+        - mqtt.publish:
+            topic: greenhouse/soil${device_number}/air_humidity_2
+            payload: !lambda 'return to_string(x);'
+            retain: true
+    update_interval: ${sensor_update_interval}
+
+  # -------- Standard Monitoring Components --------
+  - platform: wifi_signal
+    name: "WiFi Signal"
+    id: wifi_signal_sensor
+    update_interval: 10s
+    unit_of_measurement: "dBm"
+    device_class: signal_strength
+    entity_category: diagnostic
+
+  - platform: uptime
+    name: "Uptime"
+    id: uptime_sensor
+    device_class: duration
+    entity_category: diagnostic
+
+  - platform: internal_temperature
+    name: "Device Temperature"
+    id: device_temperature
+    update_interval: 10s
+    entity_category: diagnostic
+
+  - platform: template
+    name: "Free Heap"
+    id: free_heap
+    lambda: 'return heap_caps_get_free_size(MALLOC_CAP_INTERNAL);'
+    update_interval: 10s
+    unit_of_measurement: "bytes"
+    entity_category: diagnostic
+    accuracy_decimals: 0
+
+  - platform: template
+    name: "Hours Since Boot"
+    lambda: 'return id(uptime_sensor).state / 3600.0;'
+    update_interval: 10s
+    unit_of_measurement: "h"
+    accuracy_decimals: 1
+    entity_category: diagnostic
+
+binary_sensor:
+  # -------- Device Status --------
+  - platform: status
+    name: "Device Status"
+    id: device_status
+    device_class: connectivity
+
+  # -------- Battery Alerts --------
+  - platform: template
+    name: "Low Battery Alert"
+    id: low_battery_alert
+    lambda: 'return id(battery_level).state < 20;'
+    device_class: battery
+    on_press:
+      then:
+        - logger.log: "Low battery detected - conserving power"
+        - if:
+            condition:
+              lambda: 'return id(battery_level).state < 10;'
+            then:
+              - logger.log: "Critical battery level - extending sleep duration"
+
+  # -------- Temperature Alerts --------
+  - platform: template
+    name: "Device Overheating"
+    lambda: 'return id(device_temperature).state > 70.0;'
+    device_class: heat
+
+text_sensor:
+  # -------- Reset Reason --------
+  - platform: template
+    name: "Last Reset Reason"
+    id: reset_reason
+    lambda: |-
+      switch (esp_reset_reason()) {
+        case ESP_RST_POWERON: return {"Power On"};
+        case ESP_RST_EXT: return {"External Reset"};
+        case ESP_RST_SW: return {"Software Reset"};
+        case ESP_RST_PANIC: return {"Exception/Panic"};
+        case ESP_RST_INT_WDT: return {"Interrupt Watchdog"};
+        case ESP_RST_TASK_WDT: return {"Task Watchdog"};
+        case ESP_RST_WDT: return {"Other Watchdog"};
+        case ESP_RST_DEEPSLEEP: return {"Deep Sleep Wake"};
+        case ESP_RST_BROWNOUT: return {"Brownout Reset"};
+        case ESP_RST_SDIO: return {"SDIO Reset"};
+        default: return {"Unknown"};
+      }
+    entity_category: diagnostic
+
+switch:
+  # -------- OTA Mode Control --------
+  - platform: template
+    name: "OTA Mode"
+    id: ota_mode
+    icon: mdi:upload-network
+    entity_category: config
+    restore_mode: DISABLED  # Start with OFF, will be set by MQTT retained message
+    optimistic: true  # We control the state internally
+    turn_on_action:
+      - logger.log: "OTA mode enabled - preventing deep sleep"
+      - deep_sleep.prevent: deep_sleep_controller
+      - mqtt.publish:
+          topic: greenhouse/soil${device_number}/ota_mode/state
+          payload: "ON"
+          retain: true
+      - mqtt.publish:
+          topic: greenhouse/soil${device_number}/ota_mode/set
+          payload: "ON"
+          retain: true
+    turn_off_action:
+      - logger.log: "OTA mode disabled - allowing deep sleep"
+      - deep_sleep.allow: deep_sleep_controller
+      - mqtt.publish:
+          topic: greenhouse/soil${device_number}/ota_mode/state
+          payload: "OFF"
+          retain: true
+      - mqtt.publish:
+          topic: greenhouse/soil${device_number}/ota_mode/set
+          payload: "OFF"
+          retain: true
+      - delay: 2s
+      - deep_sleep.enter: deep_sleep_controller
+
+  # -------- Safe Mode --------
+  - platform: safe_mode
+    name: "Safe Mode"
+    id: safe_mode_switch
+    entity_category: config
+
+button:
+  # -------- Manual Controls --------
+  - platform: restart
+    name: "Restart Device"
+    id: restart_button
+    entity_category: config
+
+  - platform: template
+    name: "Force Sleep"
+    id: force_sleep_button
+    icon: mdi:sleep
+    entity_category: config
+    on_press:
+      - if:
+          condition:
+            switch.is_off: ota_mode
+          then:
+            - logger.log: "Forcing deep sleep..."
+            - deep_sleep.enter: deep_sleep_controller
+          else:
+            - logger.log: "Cannot sleep - OTA mode is active"
+
+# Status LED
+status_led:
+  pin:
+    number: GPIO10  # Built-in LED on XIAO ESP32-C3
+    inverted: true
+
+# Periodic data collection and averaging
+interval:
+  # Increment reading counter
+  - interval: ${sensor_update_interval}
+    then:
+      - lambda: |-
+          id(reading_count) += 1;
+          ESP_LOGD("readings", "Reading count: %d", id(reading_count));
+  
+  # After 20 seconds, send averaged data
+  - interval: 20s
+    then:
+      - if:
+          condition:
+            lambda: 'return id(reading_count) > 0;'
+          then:
+            - logger.log: 
+                format: "Sending averaged data after %d readings"
+                args: ['id(reading_count)']
+            - mqtt.publish:
+                topic: greenhouse/soil${device_number}/averaged_data
+                payload: !lambda |-
+                  char buffer[512];
+                  int count = id(reading_count);
+                  sprintf(buffer, 
+                    "{\"readings\":%d,\"soil1\":%.1f,\"soil2\":%.1f,\"soil_temp1\":%.1f,\"soil_temp2\":%.1f,\"air_temp1\":%.1f,\"air_temp2\":%.1f,\"humidity1\":%.1f,\"humidity2\":%.1f,\"battery\":%.2f}",
+                    count,
+                    count > 0 ? id(soil1_sum) / count : 0,
+                    count > 0 ? id(soil2_sum) / count : 0,
+                    count > 0 ? id(temp1_sum) / count : 0,
+                    count > 0 ? id(temp2_sum) / count : 0,
+                    count > 0 ? id(temp1_sum) / count : 0,
+                    count > 0 ? id(temp2_sum) / count : 0,
+                    count > 0 ? id(humidity1_sum) / count : 0,
+                    count > 0 ? id(humidity2_sum) / count : 0,
+                    id(battery_voltage).state
+                  );
+                  return std::string(buffer);
+                retain: true
+            # Reset counters
+            - lambda: |-
+                id(reading_count) = 0;
+                id(soil1_sum) = 0.0;
+                id(soil2_sum) = 0.0;
+                id(temp1_sum) = 0.0;
+                id(temp2_sum) = 0.0;
+                id(humidity1_sum) = 0.0;
+                id(humidity2_sum) = 0.0;
+  
+  # Periodic diagnostics (only when awake)
+  - interval: 10s
+    then:
+      - mqtt.publish:
+          topic: greenhouse/soil${device_number}/diagnostics
+          payload: !lambda |-
+            char buffer[400];
+            sprintf(buffer, 
+              "{\"uptime\":%d,\"wifi_rssi\":%.0f,\"free_heap\":%d,\"temperature\":%.1f,\"battery\":%.1f,\"ota_mode\":\"%s\"}",
+              (int)id(uptime_sensor).state,
+              id(wifi_signal_sensor).state,
+              (int)id(free_heap).state,
+              id(device_temperature).state,
+              id(battery_level).state,
+              id(ota_mode).state ? "on" : "off"
+            );
+            return std::string(buffer);
+          retain: false
+
+# Handle deep sleep based on OTA mode
+script:
+  - id: check_sleep_conditions
+    then:
+      - if:
+          condition:
+            switch.is_off: ota_mode
+          then:
+            - logger.log: "Entering deep sleep..."
+            - deep_sleep.enter: deep_sleep_controller
+          else:
+            - logger.log: "Staying awake - OTA mode active"
