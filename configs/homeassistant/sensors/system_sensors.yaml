@@ -1,0 +1,37 @@
+# System monitoring sensors via command line
+- platform: command_line
+  name: "CPU Usage"
+  command: "top -bn1 | grep 'Cpu(s)' | awk '{print $2}' | sed 's/%us,//'"
+  unit_of_measurement: "%"
+  scan_interval: 60
+  
+- platform: command_line
+  name: "Memory Usage"
+  command: "free | grep Mem | awk '{printf \"%.1f\", $3/$2 * 100.0}'"
+  unit_of_measurement: "%"
+  scan_interval: 60
+  
+- platform: command_line
+  name: "Disk Usage"
+  command: "df -h / | awk 'NR==2{printf \"%s\", $5}' | sed 's/%//'"
+  unit_of_measurement: "%"
+  scan_interval: 60
+
+# Database monitoring
+- platform: sql
+  db_url: !secret db_url
+  queries:
+    - name: "Database Size"
+      query: "SELECT ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS size_mb FROM information_schema.tables WHERE table_schema = 'homeassistant';"
+      column: 'size_mb'
+      unit_of_measurement: 'MB'
+      
+    - name: "Recorder Events"
+      query: "SELECT COUNT(*) FROM events WHERE created > DATE_SUB(NOW(), INTERVAL 24 HOUR);"
+      column: 'COUNT(*)'
+      unit_of_measurement: 'events'
+      
+    - name: "Recorder States"
+      query: "SELECT COUNT(*) FROM states WHERE created > DATE_SUB(NOW(), INTERVAL 24 HOUR);"
+      column: 'COUNT(*)'
+      unit_of_measurement: 'states'

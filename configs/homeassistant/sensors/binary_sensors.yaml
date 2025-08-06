@@ -1,0 +1,24 @@
+# Binary sensors for Docker containers
+- platform: command_line
+  name: "HomeAssistant Container"
+  command: 'docker ps --format "table {{.Names}}\t{{.Status}}" | grep homeassistant | grep -q "Up"'
+  device_class: running
+  scan_interval: 60
+  
+- platform: command_line
+  name: "MariaDB Container"
+  command: 'docker ps --format "table {{.Names}}\t{{.Status}}" | grep mariadb | grep -q "Up"'
+  device_class: running
+  scan_interval: 60
+  
+- platform: command_line
+  name: "Mosquitto Container"
+  command: 'docker ps --format "table {{.Names}}\t{{.Status}}" | grep mosquitto | grep -q "Up"'
+  device_class: running
+  scan_interval: 60
+  
+- platform: command_line
+  name: "ESPHome Container"
+  command: 'docker ps --format "table {{.Names}}\t{{.Status}}" | grep esphome | grep -q "Up"'
+  device_class: running
+  scan_interval: 60

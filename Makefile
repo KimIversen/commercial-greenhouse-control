@@ -89,14 +89,67 @@ update-configs:
 		echo "$(RED)❌ Failed to download MQTT sensor configuration$(NC)"; \
 	fi
 	
-	@echo "Downloading sensors configuration..."
-	@curl -s -o config/homeassistant/sensors.yaml.new $(GITHUB_URL)/configs/homeassistant/sensors.yaml
-	@if [ -f config/homeassistant/sensors.yaml.new ]; then \
-		mv config/homeassistant/sensors.yaml config/homeassistant/sensors.yaml.backup.$$(date +%Y%m%d_%H%M%S) 2>/dev/null || true; \
-		mv config/homeassistant/sensors.yaml.new config/homeassistant/sensors.yaml; \
-		echo "✅ Sensors configuration updated"; \
+	@echo "Downloading sensors directory..."
+	@mkdir -p config/homeassistant/sensors
+	
+	@echo "  - System sensors..."
+	@curl -s -o config/homeassistant/sensors/system_sensors.yaml.new $(GITHUB_URL)/configs/homeassistant/sensors/system_sensors.yaml
+	@if [ -f config/homeassistant/sensors/system_sensors.yaml.new ]; then \
+		mv config/homeassistant/sensors/system_sensors.yaml config/homeassistant/sensors/system_sensors.yaml.backup.$$(date +%Y%m%d_%H%M%S) 2>/dev/null || true; \
+		mv config/homeassistant/sensors/system_sensors.yaml.new config/homeassistant/sensors/system_sensors.yaml; \
+		echo "    ✅ System sensors updated"; \
 	else \
-		echo "$(RED)❌ Failed to download sensors configuration$(NC)"; \
+		echo "    $(RED)❌ Failed to download system sensors$(NC)"; \
+	fi
+	
+	@echo "  - Binary sensors..."
+	@curl -s -o config/homeassistant/sensors/binary_sensors.yaml.new $(GITHUB_URL)/configs/homeassistant/sensors/binary_sensors.yaml
+	@if [ -f config/homeassistant/sensors/binary_sensors.yaml.new ]; then \
+		mv config/homeassistant/sensors/binary_sensors.yaml config/homeassistant/sensors/binary_sensors.yaml.backup.$$(date +%Y%m%d_%H%M%S) 2>/dev/null || true; \
+		mv config/homeassistant/sensors/binary_sensors.yaml.new config/homeassistant/sensors/binary_sensors.yaml; \
+		echo "    ✅ Binary sensors updated"; \
+	else \
+		echo "    $(RED)❌ Failed to download binary sensors$(NC)"; \
+	fi
+	
+	@echo "  - Template sensors..."
+	@curl -s -o config/homeassistant/sensors/template_sensors.yaml.new $(GITHUB_URL)/configs/homeassistant/sensors/template_sensors.yaml
+	@if [ -f config/homeassistant/sensors/template_sensors.yaml.new ]; then \
+		mv config/homeassistant/sensors/template_sensors.yaml config/homeassistant/sensors/template_sensors.yaml.backup.$$(date +%Y%m%d_%H%M%S) 2>/dev/null || true; \
+		mv config/homeassistant/sensors/template_sensors.yaml.new config/homeassistant/sensors/template_sensors.yaml; \
+		echo "    ✅ Template sensors updated"; \
+	else \
+		echo "    $(RED)❌ Failed to download template sensors$(NC)"; \
+	fi
+	
+	@echo "  - Input helpers..."
+	@curl -s -o config/homeassistant/sensors/input_helpers.yaml.new $(GITHUB_URL)/configs/homeassistant/sensors/input_helpers.yaml
+	@if [ -f config/homeassistant/sensors/input_helpers.yaml.new ]; then \
+		mv config/homeassistant/sensors/input_helpers.yaml config/homeassistant/sensors/input_helpers.yaml.backup.$$(date +%Y%m%d_%H%M%S) 2>/dev/null || true; \
+		mv config/homeassistant/sensors/input_helpers.yaml.new config/homeassistant/sensors/input_helpers.yaml; \
+		echo "    ✅ Input helpers updated"; \
+	else \
+		echo "    $(RED)❌ Failed to download input helpers$(NC)"; \
+	fi
+	
+	@echo "  - Input datetime..."
+	@curl -s -o config/homeassistant/sensors/input_datetime.yaml.new $(GITHUB_URL)/configs/homeassistant/sensors/input_datetime.yaml
+	@if [ -f config/homeassistant/sensors/input_datetime.yaml.new ]; then \
+		mv config/homeassistant/sensors/input_datetime.yaml config/homeassistant/sensors/input_datetime.yaml.backup.$$(date +%Y%m%d_%H%M%S) 2>/dev/null || true; \
+		mv config/homeassistant/sensors/input_datetime.yaml.new config/homeassistant/sensors/input_datetime.yaml; \
+		echo "    ✅ Input datetime updated"; \
+	else \
+		echo "    $(RED)❌ Failed to download input datetime$(NC)"; \
+	fi
+	
+	@echo "  - Input buttons..."
+	@curl -s -o config/homeassistant/sensors/input_buttons.yaml.new $(GITHUB_URL)/configs/homeassistant/sensors/input_buttons.yaml
+	@if [ -f config/homeassistant/sensors/input_buttons.yaml.new ]; then \
+		mv config/homeassistant/sensors/input_buttons.yaml config/homeassistant/sensors/input_buttons.yaml.backup.$$(date +%Y%m%d_%H%M%S) 2>/dev/null || true; \
+		mv config/homeassistant/sensors/input_buttons.yaml.new config/homeassistant/sensors/input_buttons.yaml; \
+		echo "    ✅ Input buttons updated"; \
+	else \
+		echo "    $(RED)❌ Failed to download input buttons$(NC)"; \
 	fi
 	
 	@echo "Downloading automations configuration..."

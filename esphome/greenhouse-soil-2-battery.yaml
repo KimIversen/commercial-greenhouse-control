@@ -136,10 +136,11 @@ deep_sleep:
   run_duration: ${awake_duration}
   sleep_duration: ${sleep_duration}
 
-# Dallas DS18B20 temperature sensors
-dallas:
-  - pin: ${dallas_pin}
-    update_interval: ${sensor_update_interval}
+# OneWire bus for DS18B20 temperature sensors
+one_wire:
+  - platform: gpio
+    pin: ${dallas_pin}
+    id: gpio_one_wire_bus
 
 # Global variables for averaging
 globals:
@@ -155,14 +156,15 @@ globals:
     type: float
     restore_value: no
     initial_value: '0.0'
-  - id: temp1_sum
-    type: float
-    restore_value: no
-    initial_value: '0.0'
-  - id: temp2_sum
-    type: float
-    restore_value: no
-    initial_value: '0.0'
+  # Temporarily removed until DS18B20 addresses are discovered
+  # - id: temp1_sum
+  #   type: float
+  #   restore_value: no
+  #   initial_value: '0.0'
+  # - id: temp2_sum
+  #   type: float
+  #   restore_value: no
+  #   initial_value: '0.0'
   - id: humidity1_sum
     type: float
     restore_value: no
@@ -178,7 +180,7 @@ sensor:
     pin: ${battery_pin}
     name: "Battery Voltage"
     id: battery_voltage
-    attenuation: 11dB
+    attenuation: 12db
     filters:
       - multiply: 2.0  # Adjust based on your voltage divider (220k resistors)
       - sliding_window_moving_average:
@@ -311,36 +313,32 @@ sensor:
           retain: true
 
   # -------- DS18B20 Temperature Sensors --------
-  - platform: dallas
-    address: 0x0000000000000000  # Replace with actual address after discovery
+  - platform: dallas_temp
+    one_wire_id: gpio_one_wire_bus
+    address: 0xef00000052569928
     name: "Soil Temperature 1"
     id: soil_temp_1
     unit_of_measurement: "°C"
     device_class: temperature
     state_class: measurement
     accuracy_decimals: 1
-    filters:
-      - lambda: |-
-          id(temp1_sum) += x;
-          return x;
+    update_interval: ${sensor_update_interval}
     on_value:
       - mqtt.publish:
           topic: greenhouse/soil${device_number}/soil_temp_1
           payload: !lambda 'return to_string(x);'
           retain: true
 
-  - platform: dallas
-    address: 0x0000000000000001  # Replace with actual address after discovery
+  - platform: dallas_temp
+    one_wire_id: gpio_one_wire_bus
+    address: 0xd4000000510c7f28
     name: "Soil Temperature 2"
     id: soil_temp_2
     unit_of_measurement: "°C"
     device_class: temperature
     state_class: measurement
     accuracy_decimals: 1
-    filters:
-      - lambda: |-
-          id(temp2_sum) += x;
-          return x;
+    update_interval: ${sensor_update_interval}
     on_value:
       - mqtt.publish:
           topic: greenhouse/soil${device_number}/soil_temp_2
@@ -354,10 +352,6 @@ sensor:
     temperature:
       name: "Air Temperature 1"
       id: air_temp_1
-      filters:
-        - lambda: |-
-            id(temp1_sum) += x;
-            return x;
       on_value:
         - mqtt.publish:
             topic: greenhouse/soil${device_number}/air_temp_1
@@ -383,10 +377,6 @@ sensor:
     temperature:
       name: "Air Temperature 2"
       id: air_temp_2
-      filters:
-        - lambda: |-
-            id(temp2_sum) += x;
-            return x;
       on_value:
         - mqtt.publish:
             topic: greenhouse/soil${device_number}/air_temp_2
@@ -586,14 +576,10 @@ interval:
                   char buffer[512];
                   int count = id(reading_count);
                   sprintf(buffer, 
-                    "{\"readings\":%d,\"soil1\":%.1f,\"soil2\":%.1f,\"soil_temp1\":%.1f,\"soil_temp2\":%.1f,\"air_temp1\":%.1f,\"air_temp2\":%.1f,\"humidity1\":%.1f,\"humidity2\":%.1f,\"battery\":%.2f}",
+                    "{\"readings\":%d,\"soil1\":%.1f,\"soil2\":%.1f,\"humidity1\":%.1f,\"humidity2\":%.1f,\"battery\":%.2f}",
                     count,
                     count > 0 ? id(soil1_sum) / count : 0,
                     count > 0 ? id(soil2_sum) / count : 0,
-                    count > 0 ? id(temp1_sum) / count : 0,
-                    count > 0 ? id(temp2_sum) / count : 0,
-                    count > 0 ? id(temp1_sum) / count : 0,
-                    count > 0 ? id(temp2_sum) / count : 0,
                     count > 0 ? id(humidity1_sum) / count : 0,
                     count > 0 ? id(humidity2_sum) / count : 0,
                     id(battery_voltage).state
@@ -605,8 +591,6 @@ interval:
                 id(reading_count) = 0;
                 id(soil1_sum) = 0.0;
                 id(soil2_sum) = 0.0;
-                id(temp1_sum) = 0.0;
-                id(temp2_sum) = 0.0;
                 id(humidity1_sum) = 0.0;
                 id(humidity2_sum) = 0.0;
   

@@ -1,0 +1,8 @@
+# Input buttons for manual actions
+restart_homeassistant:
+  name: "Restart Home Assistant"
+  icon: mdi:restart
+  
+manual_backup:
+  name: "Manual Backup"
+  icon: mdi:content-save
