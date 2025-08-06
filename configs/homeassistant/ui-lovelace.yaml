@@ -64,36 +64,22 @@ views:
     icon: mdi:thermometer-lines
     cards:
       # Temperature Overview
-      - type: custom:mini-graph-card
+      - type: history-graph
+        title: Temperature Trends (24h)
         entities:
           - entity: sensor.greenhouse_climate_1_temperature
-            name: Zone 1
           - entity: sensor.greenhouse_climate_2_temperature
-            name: Zone 2
-        name: Temperature Trends
         hours_to_show: 24
-        points_per_hour: 2
-        line_width: 2
-        animate: true
-        show:
-          extrema: true
-          average: true
+        refresh_interval: 60
 
       # Humidity Overview  
-      - type: custom:mini-graph-card
+      - type: history-graph
+        title: Humidity Trends (24h)
         entities:
           - entity: sensor.greenhouse_climate_1_humidity
-            name: Zone 1
           - entity: sensor.greenhouse_climate_2_humidity
-            name: Zone 2
-        name: Humidity Trends
         hours_to_show: 24
-        points_per_hour: 2
-        line_width: 2
-        animate: true
-        show:
-          extrema: true
-          average: true
+        refresh_interval: 60
 
       # Current Readings
       - type: horizontal-stack
@@ -157,27 +143,13 @@ views:
     icon: mdi:water-percent
     cards:
       # Soil Moisture Trends
-      - type: custom:mini-graph-card
+      - type: history-graph
+        title: Soil Moisture Trends (48h)
         entities:
           - entity: sensor.greenhouse_soil_1_average_vwc
-            name: Zone 1 (3 sensors)
           - entity: sensor.greenhouse_soil_2_average_vwc
-            name: Zone 2 (2 sensors, battery)
-        name: Soil Moisture Trends
         hours_to_show: 48
-        points_per_hour: 1
-        line_width: 3
-        animate: true
-        show:
-          extrema: true
-          average: true
-        color_thresholds:
-          - value: 35
-            color: "#e74c3c"
-          - value: 45
-            color: "#f39c12"
-          - value: 60
-            color: "#27ae60"
+        refresh_interval: 60
 
       # Zone 1 Detailed View (3 sensors)
       - type: entities
@@ -245,65 +217,34 @@ views:
             needle: true
 
       # Individual Sensor Trends - Zone 1
-      - type: custom:mini-graph-card
+      - type: history-graph
+        title: Zone 1 - Individual Sensor Trends (24h)
         entities:
           - entity: sensor.greenhouse_soil_1_1_vwc
-            name: Sensor 1.1
           - entity: sensor.greenhouse_soil_1_2_vwc
-            name: Sensor 1.2
           - entity: sensor.greenhouse_soil_1_3_vwc
-            name: Sensor 1.3
-        name: Zone 1 - Individual Sensor Trends
         hours_to_show: 24
-        points_per_hour: 2
-        line_width: 2
-        animate: true
+        refresh_interval: 60
 
       # Individual Sensor Trends - Zone 2 (Battery)
-      - type: custom:mini-graph-card
+      - type: history-graph
+        title: Zone 2 - Soil Moisture Trends (24h)
         entities:
           - entity: sensor.greenhouse_soil_2_vwc_sensor_1
-            name: Soil Sensor 1
           - entity: sensor.greenhouse_soil_2_vwc_sensor_2
-            name: Soil Sensor 2
-        name: Zone 2 - Soil Moisture Trends (Battery)
         hours_to_show: 24
-        points_per_hour: 2
-        line_width: 2
-        animate: true
+        refresh_interval: 60
 
   - title: Battery Monitor
     path: battery
     icon: mdi:battery
     cards:
       # Device Header with Status
-      - type: custom:button-card
+      - type: entity
         entity: binary_sensor.greenhouse_soil_2_status
         name: Soil Monitor 2 (Battery Powered)
         icon: mdi:flower
-        show_state: true
-        styles:
-          card:
-            - background: >
-                [[[ 
-                  if (entity.state === 'on') return 'linear-gradient(90deg, #28a745, #20c997)';
-                  else return 'linear-gradient(90deg, #dc3545, #fd7e14)';
-                ]]]
-            - color: white
-            - font-weight: bold
-            - padding: 15px
-          icon:
-            - color: white
-            - width: 40px
-          name:
-            - font-size: 18px
-          state:
-            - font-size: 14px
-        state_display: >
-          [[[
-            if (entity.state === 'on') return 'Online';
-            else return 'Offline';
-          ]]]
+        state_color: true
 
       # Battery and Power Management
       - type: horizontal-stack
@@ -359,66 +300,34 @@ views:
         columns: 2
         cards:
           # Soil Moisture
-          - type: custom:mini-graph-card
-            name: Soil Moisture
+          - type: history-graph
+            title: Soil Moisture (24h)
             entities:
               - entity: sensor.greenhouse_soil_2_vwc_sensor_1
-                name: Sensor 1
-                color: '#2196f3'
               - entity: sensor.greenhouse_soil_2_vwc_sensor_2
-                name: Sensor 2
-                color: '#4caf50'
               - entity: sensor.greenhouse_soil_2_average_vwc
-                name: Average
-                color: '#ff9800'
-                show_fill: false
             hours_to_show: 24
-            points_per_hour: 4
-            line_width: 2
-            show:
-              labels: true
-              legend: true
+            refresh_interval: 60
 
           # Temperature Readings
-          - type: custom:mini-graph-card
-            name: Temperature
+          - type: history-graph
+            title: Temperature (24h)
             entities:
               - entity: sensor.greenhouse_soil_2_temperature_1
-                name: Soil 1
-                color: '#8b4513'
               - entity: sensor.greenhouse_soil_2_temperature_2
-                name: Soil 2
-                color: '#a0522d'
               - entity: sensor.greenhouse_soil_2_air_temperature_1
-                name: Air 1
-                color: '#87ceeb'
               - entity: sensor.greenhouse_soil_2_air_temperature_2
-                name: Air 2
-                color: '#4682b4'
             hours_to_show: 24
-            points_per_hour: 4
-            line_width: 2
-            show:
-              labels: true
-              legend: true
+            refresh_interval: 60
 
           # Humidity Readings
-          - type: custom:mini-graph-card
-            name: Humidity
+          - type: history-graph
+            title: Humidity (24h)
             entities:
               - entity: sensor.greenhouse_soil_2_air_humidity_1
-                name: Sensor 1
-                color: '#00bcd4'
               - entity: sensor.greenhouse_soil_2_air_humidity_2
-                name: Sensor 2
-                color: '#009688'
             hours_to_show: 24
-            points_per_hour: 4
-            line_width: 2
-            show:
-              labels: true
-              legend: true
-            unit: '%'
+            refresh_interval: 60
 
           # Device Health
           - type: entities
@@ -438,26 +347,12 @@ views:
                 icon: mdi:memory
 
       # Battery History
-      - type: custom:mini-graph-card
-        name: Battery History (7 days)
+      - type: history-graph
+        title: Battery History (7 days)
         entities:
           - entity: sensor.greenhouse_soil_2_battery_level
-            name: Battery Level
-            color: >
-              [[[
-                const level = states['sensor.greenhouse_soil_2_battery_level'].state;
-                if (level > 40) return '#4caf50';
-                else if (level > 20) return '#ff9800';
-                else return '#f44336';
-              ]]]
         hours_to_show: 168
-        points_per_hour: 0.25
-        line_width: 2
-        show:
-          labels: true
-          points: false
-          average: true
-          extrema: true
+        refresh_interval: 300
 
       # Battery Alerts
       - type: conditional
@@ -465,16 +360,9 @@ views:
           - entity: binary_sensor.greenhouse_soil_2_low_battery
             state: 'on'
         card:
-          type: custom:button-card
+          type: button
           name: Low Battery Warning
           icon: mdi:battery-alert
-          styles:
-            card:
-              - background: '#ff9800'
-              - color: white
-              - padding: 10px
-            icon:
-              - color: white
           tap_action:
             action: call-service
             service: script.soil2_mark_battery_charged
@@ -566,104 +454,50 @@ views:
     icon: mdi:chart-line
     cards:
       # Long-term Temperature Trends
-      - type: custom:mini-graph-card
+      - type: history-graph
+        title: Temperature History (7 Days)
         entities:
           - entity: sensor.greenhouse_climate_1_temperature
-            name: Zone 1 Climate
           - entity: sensor.greenhouse_climate_2_temperature
-            name: Zone 2 Climate
           - entity: sensor.greenhouse_soil_2_air_temperature_1
-            name: Zone 2 Air Temp 1
           - entity: sensor.greenhouse_soil_2_air_temperature_2
-            name: Zone 2 Air Temp 2
-        name: Temperature History (7 Days)
         hours_to_show: 168
-        points_per_hour: 0.25
-        line_width: 2
-        animate: false
-        show:
-          extrema: true
-          average: true
+        refresh_interval: 300
 
       # Long-term Humidity Trends
-      - type: custom:mini-graph-card
+      - type: history-graph
+        title: Humidity History (7 Days)
         entities:
           - entity: sensor.greenhouse_climate_1_humidity
-            name: Zone 1 Climate
           - entity: sensor.greenhouse_climate_2_humidity
-            name: Zone 2 Climate
           - entity: sensor.greenhouse_soil_2_air_humidity_1
-            name: Zone 2 Air Hum 1
           - entity: sensor.greenhouse_soil_2_air_humidity_2
-            name: Zone 2 Air Hum 2
-        name: Humidity History (7 Days)
         hours_to_show: 168
-        points_per_hour: 0.25
-        line_width: 2
-        animate: false
-        show:
-          extrema: true
-          average: true
+        refresh_interval: 300
 
       # Long-term Soil Moisture Trends
-      - type: custom:mini-graph-card
+      - type: history-graph
+        title: Soil Moisture History (14 Days)
         entities:
           - entity: sensor.greenhouse_soil_1_average_vwc
-            name: Zone 1 Soil (Powered)
           - entity: sensor.greenhouse_soil_2_average_vwc
-            name: Zone 2 Soil (Battery)
-        name: Soil Moisture History (14 Days)
         hours_to_show: 336
-        points_per_hour: 0.125
-        line_width: 2
-        animate: false
-        show:
-          extrema: true
-          average: true
-        color_thresholds:
-          - value: 35
-            color: "#e74c3c"
-          - value: 45
-            color: "#f39c12"
-          - value: 60
-            color: "#27ae60"
+        refresh_interval: 600
 
       # Soil Temperature History
-      - type: custom:mini-graph-card
+      - type: history-graph
+        title: Soil Temperature History (7 Days)
         entities:
           - entity: sensor.greenhouse_soil_2_temperature_1
-            name: Soil Temp 1
           - entity: sensor.greenhouse_soil_2_temperature_2
-            name: Soil Temp 2
-        name: Soil Temperature History (7 Days)
         hours_to_show: 168
-        points_per_hour: 0.25
-        line_width: 2
-        animate: false
-        show:
-          extrema: true
-          average: true
+        refresh_interval: 300
 
       # Battery Level History
-      - type: custom:mini-graph-card
+      - type: history-graph
+        title: Battery History (30 Days)
         entities:
           - entity: sensor.greenhouse_soil_2_battery_level
-            name: Battery Level
           - entity: sensor.greenhouse_soil_2_battery_voltage
-            name: Battery Voltage
-            y_axis: secondary
-        name: Battery History (30 Days)
         hours_to_show: 720
-        points_per_hour: 0.0625
-        line_width: 2
-        animate: false
-        show:
-          extrema: true
-          average: true
-        color_thresholds:
-          - value: 20
-            color: "#e74c3c"
-          - value: 40
-            color: "#f39c12"
-          - value: 80
-            color: "#27ae60"
+        refresh_interval: 600

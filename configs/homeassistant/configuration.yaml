@@ -56,11 +56,6 @@ config:
 # Lovelace YAML mode
 lovelace:
   mode: yaml
-  resources:
-    - url: /hacsfiles/mini-graph-card/mini-graph-card-bundle.js
-      type: module
-    - url: /hacsfiles/button-card/button-card.js
-      type: module
 
 # Include all configuration files
 automation: !include automations.yaml
