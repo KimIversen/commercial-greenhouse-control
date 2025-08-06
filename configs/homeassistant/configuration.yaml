@@ -52,6 +52,7 @@ system_health:
 mobile_app:
 frontend:
 config:
+history:
 
 # Lovelace YAML mode
 lovelace:
