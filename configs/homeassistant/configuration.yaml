@@ -67,13 +67,13 @@ automation: !include automations.yaml
 script: !include scripts.yaml
 scene: !include scenes.yaml
 
-# Include sensor components separately
-sensor: !include_dir_merge_list sensors/
-binary_sensor: !include_dir_merge_list sensors/
-template: !include_dir_merge_list sensors/
-input_boolean: !include_dir_merge_list sensors/
-input_datetime: !include_dir_merge_list sensors/
-input_button: !include_dir_merge_list sensors/
+# Include sensor components directly
+sensor: !include sensors/system_sensors.yaml
+binary_sensor: !include sensors/binary_sensors.yaml
+template: !include sensors/template_sensors.yaml
+input_boolean: !include sensors/input_helpers.yaml
+input_datetime: !include sensors/input_datetime.yaml
+input_button: !include sensors/input_buttons.yaml
 
 # Shell commands for container monitoring and backup
 shell_command:
