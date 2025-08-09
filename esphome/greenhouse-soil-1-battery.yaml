@@ -1,6 +1,6 @@
 substitutions:
-  device_number: "2"
-  device_ip: "192.168.10.153"
+  device_number: "1"
+  device_ip: "192.168.10.152"
   
   # ADC pins on XIAO ESP32-C3
   moisture_pin_1: "GPIO2"   # A0 - Soil sensor 1
@@ -55,6 +55,7 @@ logger:
     api: WARN
     ota: INFO
     deep_sleep: INFO
+    dallas.temp.sensor: DEBUG  # Enable debug for Dallas sensors to see addresses
 
 api:
   encryption:
@@ -234,6 +235,7 @@ sensor:
     internal: true
 
   # -------- Soil VWC Calculations --------
+  # NOTE: These calibration values are placeholders and need to be calibrated for your specific sensors
   - platform: template
     name: "Soil VWC Sensor 1"
     id: soil_vwc_1
@@ -246,10 +248,11 @@ sensor:
       return id(s1_raw).state;
     filters:
       - calibrate_linear:
-          - 1345 -> 51.0
-          - 1396 -> 45.0
-          - 1556 -> 30.0
-          - 3408 -> 0.0
+          # TODO: Calibrate these values with actual soil samples
+          - 1350 -> 51.0
+          - 1400 -> 45.0
+          - 1600 -> 30.0
+          - 3400 -> 0.0
       - lambda: |-
           if (x < 0.0f) x = 0.0f;
           if (x > 60.0f) x = 60.0f;
@@ -273,10 +276,11 @@ sensor:
       return id(s2_raw).state;
     filters:
       - calibrate_linear:
-          - 1381 -> 51.0
-          - 1454 -> 45.0
-          - 1881 -> 30.0
-          - 3457 -> 0.0
+          # TODO: Calibrate these values with actual soil samples
+          - 1380 -> 51.0
+          - 1450 -> 45.0
+          - 1880 -> 30.0
+          - 3450 -> 0.0
       - lambda: |-
           if (x < 0.0f) x = 0.0f;
           if (x > 60.0f) x = 60.0f;
@@ -312,9 +316,11 @@ sensor:
           retain: true
 
   # -------- DS18B20 Temperature Sensors --------
+  # NOTE: To discover sensor addresses, comment out the address lines below and check logs
+  # Then add the discovered addresses back
   - platform: dallas_temp
     one_wire_id: gpio_one_wire_bus
-    address: 0xef00000052569928
+    # address: 0x0000000000000000  # TODO: Add actual address after discovery
     name: "Soil Temperature 1"
     id: soil_temp_1
     unit_of_measurement: "°C"
@@ -330,7 +336,7 @@ sensor:
 
   - platform: dallas_temp
     one_wire_id: gpio_one_wire_bus
-    address: 0xd4000000510c7f28
+    # address: 0x0000000000000000  # TODO: Add actual address after discovery
     name: "Soil Temperature 2"
     id: soil_temp_2
     unit_of_measurement: "°C"
@@ -481,6 +487,22 @@ text_sensor:
         default: return {"Unknown"};
       }
     entity_category: diagnostic
+
+  # -------- Dallas Sensor Address Discovery --------
+  # This will show the addresses of all connected Dallas sensors in the logs
+  - platform: template
+    name: "Dallas Sensor Addresses"
+    id: dallas_addresses
+    lambda: |-
+      std::string addresses = "Found Dallas sensors at: ";
+      auto sensors = id(gpio_one_wire_bus)->get_sensors();
+      for (auto &sensor : sensors) {
+        addresses += "\n - 0x" + format_hex(sensor);
+      }
+      ESP_LOGI("dallas", "%s", addresses.c_str());
+      return {addresses};
+    entity_category: diagnostic
+    update_interval: 30s  # Only check periodically
 
 switch:
   # -------- OTA Mode Control --------
