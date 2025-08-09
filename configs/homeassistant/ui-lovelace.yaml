@@ -60,6 +60,10 @@ views:
             name: Soil 1 OTA Mode
           - entity: switch.greenhouse_soil_2_ota_mode
             name: Soil 2 OTA Mode
+          - entity: sensor.greenhouse_soil_1_sleep_status
+            name: Soil 1 Status
+          - entity: sensor.greenhouse_soil_2_sleep_status
+            name: Soil 2 Status
 
   - title: Climate
     path: climate
@@ -285,6 +289,12 @@ views:
               - entity: sensor.greenhouse_soil_1_battery_voltage
                 name: Voltage
                 icon: mdi:flash
+              - entity: sensor.greenhouse_soil_1_battery_days_remaining
+                name: Est. Days Left
+                icon: mdi:battery-clock
+              - entity: sensor.greenhouse_soil_1_sleep_status
+                name: Sleep Status
+                icon: mdi:power-sleep
               - entity: sensor.greenhouse_soil_1_uptime
                 name: Uptime
                 icon: mdi:timer-outline
@@ -312,6 +322,12 @@ views:
               - entity: sensor.greenhouse_soil_2_battery_voltage
                 name: Voltage
                 icon: mdi:flash
+              - entity: sensor.greenhouse_soil_2_battery_days_remaining
+                name: Est. Days Left
+                icon: mdi:battery-clock
+              - entity: sensor.greenhouse_soil_2_sleep_status
+                name: Sleep Status
+                icon: mdi:power-sleep
               - entity: sensor.greenhouse_soil_2_uptime
                 name: Uptime
                 icon: mdi:timer-outline
@@ -327,9 +343,36 @@ views:
           - entity: switch.greenhouse_soil_1_ota_mode
             name: Zone 1 OTA Mode
             secondary_info: When ON, device stays awake for updates
+          - type: divider
+          - entity: script.soil1_enable_ota
+            name: Wake for Update
+            icon: mdi:upload
+          - entity: script.soil1_disable_ota
+            name: Force Sleep
+            icon: mdi:sleep
+          - entity: script.soil1_mark_battery_charged
+            name: Mark Battery Charged
+            icon: mdi:battery-charging
+          - entity: script.soil1_battery_health_check
+            name: Battery Health Check
+            icon: mdi:battery-heart
+          - type: divider
           - entity: switch.greenhouse_soil_2_ota_mode
             name: Zone 2 OTA Mode
             secondary_info: When ON, device stays awake for updates
+          - type: divider
+          - entity: script.soil2_enable_ota
+            name: Wake for Update
+            icon: mdi:upload
+          - entity: script.soil2_disable_ota
+            name: Force Sleep
+            icon: mdi:sleep
+          - entity: script.soil2_mark_battery_charged
+            name: Mark Battery Charged
+            icon: mdi:battery-charging
+          - entity: script.soil2_battery_health_check
+            name: Battery Health Check
+            icon: mdi:battery-heart
 
       # Battery Level Trends
       - type: history-graph
