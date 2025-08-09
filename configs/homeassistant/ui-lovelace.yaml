@@ -342,53 +342,6 @@ views:
         hours_to_show: 168
         refresh_interval: 300
 
-          # Humidity Readings
-          - type: history-graph
-            title: Humidity (24h)
-            entities:
-              - entity: sensor.greenhouse_soil_2_air_humidity_1
-              - entity: sensor.greenhouse_soil_2_air_humidity_2
-            hours_to_show: 24
-            refresh_interval: 60
-
-          # Device Health
-          - type: entities
-            title: Device Health
-            entities:
-              - entity: sensor.greenhouse_soil_2_wifi_rssi
-                name: WiFi Signal
-                icon: mdi:wifi
-              - entity: sensor.greenhouse_soil_2_device_temperature
-                name: CPU Temp
-                icon: mdi:thermometer
-              - entity: sensor.greenhouse_soil_2_uptime
-                name: Uptime
-                icon: mdi:clock-outline
-              - entity: sensor.greenhouse_soil_2_free_heap
-                name: Free Memory
-                icon: mdi:memory
-
-      # Battery History
-      - type: history-graph
-        title: Battery History (7 days)
-        entities:
-          - entity: sensor.greenhouse_soil_2_battery_level
-        hours_to_show: 168
-        refresh_interval: 300
-
-      # Battery Alerts
-      - type: conditional
-        conditions:
-          - entity: binary_sensor.greenhouse_soil_2_low_battery
-            state: 'on'
-        card:
-          type: button
-          name: Low Battery Warning
-          icon: mdi:battery-alert
-          tap_action:
-            action: call-service
-            service: script.soil2_mark_battery_charged
-
   - title: System Health
     path: system
     icon: mdi:monitor-dashboard
@@ -398,17 +351,13 @@ views:
         title: Device Connectivity
         show_header_toggle: false
         entities:
-          - entity: binary_sensor.greenhouse_climate_1_status
-            name: Climate Zone 1
-          - entity: binary_sensor.greenhouse_climate_2_status
-            name: Climate Zone 2
+          - entity: binary_sensor.greenhouse_soil_1_status
+            name: Soil Zone 1 (Battery)
           - entity: binary_sensor.greenhouse_soil_2_status
             name: Soil Zone 2 (Battery)
           - type: divider
-          - entity: sensor.greenhouse_climate_1_wifi_signal
-            name: Climate 1 WiFi Signal
-          - entity: sensor.greenhouse_climate_2_wifi_signal
-            name: Climate 2 WiFi Signal
+          - entity: sensor.greenhouse_soil_1_wifi_rssi
+            name: Soil 1 WiFi Signal
           - entity: sensor.greenhouse_soil_2_wifi_rssi
             name: Soil 2 WiFi Signal
 
