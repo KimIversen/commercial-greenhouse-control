@@ -1,5 +1,89 @@
 # Scripts for Greenhouse Control System
 
+# ============== SOIL MONITOR 1 BATTERY MANAGEMENT ==============
+
+# Enable OTA mode for updates
+soil1_enable_ota:
+  alias: "Enable Soil 1 OTA Mode"
+  sequence:
+    - service: mqtt.publish
+      data:
+        topic: "greenhouse/soil1/ota_mode/set"
+        payload: "ON"
+        retain: true
+    - service: notify.persistent_notification
+      data:
+        title: "OTA Mode Enabled"
+        message: "Soil Monitor 1 will stay awake on next boot for updates"
+
+# Disable OTA mode to save battery
+soil1_disable_ota:
+  alias: "Disable Soil 1 OTA Mode"
+  sequence:
+    - service: mqtt.publish
+      data:
+        topic: "greenhouse/soil1/ota_mode/set"
+        payload: "OFF"
+        retain: true
+    - service: notify.persistent_notification
+      data:
+        title: "OTA Mode Disabled"
+        message: "Soil Monitor 1 will enter sleep mode on next boot"
+
+# Mark battery as charged
+soil1_mark_battery_charged:
+  alias: "Mark Soil 1 Battery Charged"
+  sequence:
+    - service: input_boolean.turn_on
+      target:
+        entity_id: input_boolean.soil_monitor_1_battery_charged
+    - service: input_datetime.set_datetime
+      target:
+        entity_id: input_datetime.soil_monitor_1_last_charge
+      data:
+        datetime: "{{ now() }}"
+    - service: notify.persistent_notification
+      data:
+        title: "Battery Charge Recorded"
+        message: "Soil Monitor 1 battery charge date has been updated"
+
+# Wake device for firmware update
+soil1_wake_for_update:
+  alias: "Wake Soil 1 for Update"
+  sequence:
+    - service: script.soil1_enable_ota
+    - delay: "00:00:05"
+    - service: notify.persistent_notification
+      data:
+        title: "Device Waking for Update"
+        message: >
+          OTA mode enabled. Device will stay awake on next wake cycle (max 15 minutes).
+          Current battery: {{ states('sensor.greenhouse_soil_1_battery_level') }}%
+
+# Force device to sleep (emergency power saving)
+soil1_force_sleep:
+  alias: "Force Soil 1 to Sleep"
+  sequence:
+    - service: script.soil1_disable_ota
+    - service: notify.persistent_notification
+      data:
+        title: "Forced Sleep Mode"
+        message: "OTA disabled. Device will enter deep sleep on next cycle."
+
+# Battery health check
+soil1_battery_health_check:
+  alias: "Soil 1 Battery Health Check"
+  sequence:
+    - service: notify.persistent_notification
+      data:
+        title: "Soil Monitor 1 - Battery Health"
+        message: >
+          Battery Level: {{ states('sensor.greenhouse_soil_1_battery_level') }}%
+          Voltage: {{ states('sensor.greenhouse_soil_1_battery_voltage') }}V
+          Days Remaining: {{ states('sensor.greenhouse_soil_1_battery_days_remaining') }}
+          Days Since Charge: {{ states('sensor.greenhouse_soil_1_days_since_charge') }}
+          Status: {{ states('sensor.greenhouse_soil_1_sleep_status') }}
+
 # ============== SOIL MONITOR 2 BATTERY MANAGEMENT ==============
 
 # Enable OTA mode for updates
@@ -94,6 +178,7 @@ greenhouse_system_health:
         message: >
           Climate 1: {{ states('binary_sensor.greenhouse_climate_1_status') }}
           Climate 2: {{ states('binary_sensor.greenhouse_climate_2_status') }}
+          Soil 1: {{ states('binary_sensor.greenhouse_soil_1_status') }}
           Soil 2: {{ states('binary_sensor.greenhouse_soil_2_status') }}
           
           Containers:

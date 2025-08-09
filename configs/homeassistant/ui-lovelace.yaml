@@ -456,6 +456,8 @@ views:
             name: Climate 1 OTA Mode
           - entity: switch.greenhouse_climate_2_ota_mode
             name: Climate 2 OTA Mode
+          - entity: switch.greenhouse_soil_1_ota_mode
+            name: Soil 1 OTA Mode
           - entity: switch.greenhouse_soil_2_ota_mode
             name: Soil 2 OTA Mode
           - type: divider
@@ -473,6 +475,8 @@ views:
         entities:
           - entity: sensor.greenhouse_climate_1_temperature
           - entity: sensor.greenhouse_climate_2_temperature
+          - entity: sensor.greenhouse_soil_1_air_temperature_1
+          - entity: sensor.greenhouse_soil_1_air_temperature_2
           - entity: sensor.greenhouse_soil_2_air_temperature_1
           - entity: sensor.greenhouse_soil_2_air_temperature_2
         hours_to_show: 168
@@ -484,6 +488,8 @@ views:
         entities:
           - entity: sensor.greenhouse_climate_1_humidity
           - entity: sensor.greenhouse_climate_2_humidity
+          - entity: sensor.greenhouse_soil_1_air_humidity_1
+          - entity: sensor.greenhouse_soil_1_air_humidity_2
           - entity: sensor.greenhouse_soil_2_air_humidity_1
           - entity: sensor.greenhouse_soil_2_air_humidity_2
         hours_to_show: 168
@@ -502,6 +508,8 @@ views:
       - type: history-graph
         title: Soil Temperature History (7 Days)
         entities:
+          - entity: sensor.greenhouse_soil_1_temperature_1
+          - entity: sensor.greenhouse_soil_1_temperature_2
           - entity: sensor.greenhouse_soil_2_temperature_1
           - entity: sensor.greenhouse_soil_2_temperature_2
         hours_to_show: 168
@@ -511,6 +519,8 @@ views:
       - type: history-graph
         title: Battery History (30 Days)
         entities:
+          - entity: sensor.greenhouse_soil_1_battery_level
+          - entity: sensor.greenhouse_soil_1_battery_voltage
           - entity: sensor.greenhouse_soil_2_battery_level
           - entity: sensor.greenhouse_soil_2_battery_voltage
         hours_to_show: 720

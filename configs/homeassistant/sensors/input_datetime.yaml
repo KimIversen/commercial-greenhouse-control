@@ -1,4 +1,9 @@
 # Input datetime for battery management
+soil_monitor_1_last_charge:
+  name: Soil Monitor 1 Last Charge Date
+  has_date: true
+  has_time: true
+
 soil_monitor_2_last_charge:
   name: Soil Monitor 2 Last Charge Date
   has_date: true

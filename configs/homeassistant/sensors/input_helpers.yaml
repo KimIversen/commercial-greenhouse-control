@@ -1,4 +1,8 @@
 # Input helpers for battery management
+soil_monitor_1_battery_charged:
+  name: Soil Monitor 1 Battery Charged
+  icon: mdi:battery-charging-100
+
 soil_monitor_2_battery_charged:
   name: Soil Monitor 2 Battery Charged
   icon: mdi:battery-charging-100

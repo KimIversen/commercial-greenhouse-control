@@ -1,5 +1,82 @@
 # Template sensors for calculated values
 sensor:
+  # ============== SOIL MONITOR 1 BATTERY CALCULATIONS ==============
+  # Battery discharge rate
+  - name: "Greenhouse Soil 1 Battery Discharge Rate"
+    unique_id: greenhouse_soil_1_battery_discharge_rate
+    unit_of_measurement: "%/day"
+    state: >
+      {% set battery = states('sensor.greenhouse_soil_1_battery_level') | float(100) %}
+      {% set prev_battery = state_attr('sensor.greenhouse_soil_1_battery_level', 'last_changed') %}
+      {% if prev_battery %}
+        {% set hours_elapsed = (now() - prev_battery).total_seconds() / 3600 %}
+        {% if hours_elapsed > 0 %}
+          {{ ((100 - battery) / hours_elapsed * 24) | round(1) }}
+        {% else %}
+          0
+        {% endif %}
+      {% else %}
+        unknown
+      {% endif %}
+    icon: mdi:battery-minus
+
+  # Estimated days remaining
+  - name: "Greenhouse Soil 1 Battery Days Remaining"
+    unique_id: greenhouse_soil_1_battery_days_remaining
+    unit_of_measurement: "days"
+    state: >
+      {% set battery = states('sensor.greenhouse_soil_1_battery_level') | float(0) %}
+      {% set discharge_rate = states('sensor.greenhouse_soil_1_battery_discharge_rate') | float(2.5) %}
+      {% if discharge_rate > 0 %}
+        {{ (battery / discharge_rate) | round(1) }}
+      {% else %}
+        unknown
+      {% endif %}
+    icon: mdi:calendar-clock
+
+  # Sleep status based on last update time
+  - name: "Greenhouse Soil 1 Sleep Status"
+    unique_id: greenhouse_soil_1_sleep_status
+    state: >
+      {% set last_update = states.sensor.greenhouse_soil_1_battery_voltage.last_changed %}
+      {% if last_update %}
+        {% set minutes_ago = ((now() - last_update).total_seconds() / 60) | int %}
+        {% if is_state('switch.greenhouse_soil_1_ota_mode', 'on') %}
+          OTA Mode Active
+        {% elif minutes_ago < 2 %}
+          Awake
+        {% elif minutes_ago < 20 %}
+          Sleeping
+        {% else %}
+          Offline
+        {% endif %}
+      {% else %}
+        Unknown
+      {% endif %}
+    icon: >
+      {% if is_state('sensor.greenhouse_soil_1_sleep_status', 'OTA Mode Active') %}
+        mdi:upload-network
+      {% elif is_state('sensor.greenhouse_soil_1_sleep_status', 'Awake') %}
+        mdi:eye
+      {% elif is_state('sensor.greenhouse_soil_1_sleep_status', 'Sleeping') %}
+        mdi:sleep
+      {% else %}
+        mdi:alert-circle
+      {% endif %}
+
+  # Days since last charge
+  - name: "Greenhouse Soil 1 Days Since Charge"
+    unique_id: greenhouse_soil_1_days_since_charge
+    unit_of_measurement: "days"
+    state: >
+      {% set last_charge = states('input_datetime.soil_monitor_1_last_charge') %}
+      {% if last_charge not in ['unknown', 'unavailable'] %}
+        {{ ((now() - as_datetime(last_charge)).days) }}
+      {% else %}
+        unknown
+      {% endif %}
+    icon: mdi:calendar-clock
+
   # ============== SOIL MONITOR 2 BATTERY CALCULATIONS ==============
   # Battery discharge rate
   - name: "Greenhouse Soil 2 Battery Discharge Rate"
