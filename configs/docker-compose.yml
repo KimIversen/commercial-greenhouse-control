@@ -1,9 +1,9 @@
 services:
-  # MariaDB - Primary Database
+  # MariaDB - Sensor data storage (for HA + future AI analysis)
   mariadb:
-    image: mariadb:10.11-jammy
+    image: mariadb:10.11
     container_name: greenhouse_mariadb
-    restart: unless-stopped
+    restart: always
     environment:
       MARIADB_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MARIADB_DATABASE: homeassistant
@@ -15,21 +15,11 @@ services:
       - ./config/mariadb/my.cnf:/etc/mysql/conf.d/my.cnf:ro
       - ./backups:/backups
     ports:
-      - "3306:3306"
-    command: >
-      --character-set-server=utf8mb4
-      --collation-server=utf8mb4_unicode_ci
-      --innodb-buffer-pool-size=8G
-      --innodb-log-file-size=512M
-      --innodb-flush-log-at-trx-commit=1
-      --sync-binlog=1
-      --binlog-format=ROW
-      --log-bin=mysql-bin
-      --max-connections=200
+      - "127.0.0.1:3306:3306"
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
-      start_period: 10s
-      interval: 10s
+      start_period: 30s
+      interval: 30s
       timeout: 5s
       retries: 3
     networks:
@@ -40,11 +30,11 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # Home Assistant - Main Control System
+  # Home Assistant - Central control system
   homeassistant:
     image: homeassistant/home-assistant:stable
     container_name: greenhouse_homeassistant
-    restart: unless-stopped
+    restart: always
     depends_on:
       mariadb:
         condition: service_healthy
@@ -58,24 +48,24 @@ services:
       - "8123:8123"
     privileged: true
     healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "8123"]
-      interval: 30s
+      test: ["CMD", "curl", "-f", "http://localhost:8123/manifest.json"]
+      interval: 60s
       timeout: 10s
       retries: 5
-      start_period: 90s
+      start_period: 120s
+    networks:
+      - greenhouse_net
     logging:
       driver: "json-file"
       options:
         max-size: "50m"
         max-file: "5"
-    networks:
-      - greenhouse_net
 
-  # ESPHome - Microcontroller Management
+  # ESPHome - ESP32 device management
   esphome:
     image: esphome/esphome:latest
     container_name: greenhouse_esphome
-    restart: unless-stopped
+    restart: always
     environment:
       TZ: ${TZ}
     volumes:
@@ -84,17 +74,19 @@ services:
     ports:
       - "6052:6052"
     privileged: true
+    networks:
+      - greenhouse_net
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
 
-  # MQTT Broker - Sensor Communication
+  # Mosquitto - MQTT broker for sensor communication
   mosquitto:
-    image: eclipse-mosquitto:2.0
+    image: eclipse-mosquitto:2
     container_name: greenhouse_mosquitto
-    restart: unless-stopped
+    restart: always
     volumes:
       - ./config/mosquitto:/mosquitto/config
       - mosquitto_data:/mosquitto/data
@@ -104,7 +96,7 @@ services:
       - "9001:9001"
     healthcheck:
       test: ["CMD", "mosquitto_pub", "-h", "localhost", "-t", "test", "-m", "test"]
-      interval: 30s
+      interval: 60s
       timeout: 10s
       retries: 3
     networks:
@@ -115,80 +107,15 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # phpMyAdmin - Database Management
-  phpmyadmin:
-    image: phpmyadmin/phpmyadmin:latest
-    container_name: greenhouse_phpmyadmin
-    restart: unless-stopped
-    depends_on:
-      - mariadb
-    environment:
-      PMA_HOST: greenhouse_mariadb
-      PMA_PORT: 3306
-      PMA_USER: root
-      PMA_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-    ports:
-      - "8080:80"
-    networks:
-      - greenhouse_net
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
-  # Uptime Kuma - Service Monitoring
-  uptime_kuma:
-    image: louislam/uptime-kuma:1
-    container_name: greenhouse_uptime_kuma
-    restart: unless-stopped
-    volumes:
-      - uptime_kuma_data:/app/data
-    ports:
-      - "3001:3001"
-    networks:
-      - greenhouse_net
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
-  # Node Exporter - System Metrics
-  node_exporter:
-    image: prom/node-exporter:latest
-    container_name: greenhouse_node_exporter
-    restart: unless-stopped
-    command:
-      - '--path.procfs=/host/proc'
-      - '--path.rootfs=/rootfs'
-      - '--path.sysfs=/host/sys'
-      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
-    volumes:
-      - /proc:/host/proc:ro
-      - /sys:/host/sys:ro
-      - /:/rootfs:ro
-    ports:
-      - "9100:9100"
-    networks:
-      - greenhouse_net
-
-  # Watchtower - Automatic Updates
+  # Watchtower - Keeps containers updated
   watchtower:
     image: containrrr/watchtower
     container_name: greenhouse_watchtower
-    restart: unless-stopped
+    restart: always
     environment:
       WATCHTOWER_CLEANUP: "true"
-      WATCHTOWER_SCHEDULE: "0 0 4 * * *"  # 4 AM daily
-      WATCHTOWER_NOTIFICATIONS: "email"
-      WATCHTOWER_NOTIFICATION_EMAIL_FROM: ${WATCHTOWER_EMAIL_FROM}
-      WATCHTOWER_NOTIFICATION_EMAIL_TO: ${WATCHTOWER_EMAIL_TO}
-      WATCHTOWER_NOTIFICATION_EMAIL_SERVER: ${SMTP_SERVER}
-      WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT: 587
-      WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER: ${SMTP_USERNAME}
-      WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD: ${SMTP_PASSWORD}
+      WATCHTOWER_SCHEDULE: "0 0 4 * * *"
+      WATCHTOWER_INCLUDE_STOPPED: "true"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     networks:
@@ -196,17 +123,9 @@ services:
 
 volumes:
   mariadb_data:
-    driver: local
-  uptime_kuma_data:
-    driver: local
   mosquitto_data:
-    driver: local
   mosquitto_logs:
-    driver: local
 
 networks:
   greenhouse_net:
     driver: bridge
-    ipam:
-      config:
-        - subnet: 172.20.0.0/16

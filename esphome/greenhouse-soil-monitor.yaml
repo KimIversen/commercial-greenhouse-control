@@ -22,6 +22,12 @@ esp32:
 
 logger:
   level: INFO
+  logs:
+    sensor: WARN
+    mqtt: INFO
+    wifi: INFO
+    api: WARN
+    ota: INFO
 
 api:
   encryption:

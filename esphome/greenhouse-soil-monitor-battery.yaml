@@ -18,13 +18,22 @@ esphome:
   friendly_name: Greenhouse Soil Monitor Battery ${device_number}
   comment: "Battery-powered VWC monitor with deep sleep"
   on_boot:
-    priority: -100
+    priority: 600
     then:
+      - logger.log: "Device booting up..."
       - wait_until:
-          condition:
-            wifi.connected:
+          mqtt.connected:
+      - logger.log: "MQTT connected, checking OTA mode from retained message..."
       - delay: 2s
-      - logger.log: "Boot complete, will take readings then sleep"
+      - if:
+          condition:
+            switch.is_on: ota_mode
+          then:
+            - logger.log: "OTA mode is ON - staying awake"
+            - deep_sleep.prevent: deep_sleep_control
+          else:
+            - logger.log: "OTA mode is OFF - will enter deep sleep cycle"
+            - deep_sleep.allow: deep_sleep_control
 
 esp32:
   board: seeed_xiao_esp32c3
@@ -33,6 +42,13 @@ esp32:
 
 logger:
   level: INFO
+  logs:
+    sensor: WARN
+    mqtt: INFO
+    wifi: INFO
+    api: WARN
+    ota: INFO
+    deep_sleep: INFO
 
 api:
   encryption:
@@ -41,6 +57,16 @@ api:
 ota:
   - platform: esphome
     password: !secret ota_password
+    on_begin:
+      then:
+        - logger.log: "OTA update starting..."
+        - switch.turn_on: ota_mode
+    on_end:
+      then:
+        - logger.log: "OTA update complete"
+    on_error:
+      then:
+        - logger.log: "OTA update failed"
 
 wifi:
   ssid: !secret wifi_ssid
@@ -69,6 +95,19 @@ mqtt:
     topic: greenhouse/soilbat${device_number}/status
     payload: offline
     retain: true
+  on_message:
+    - topic: greenhouse/soilbat${device_number}/ota_mode/set
+      payload: "ON"
+      qos: 1
+      then:
+        - switch.turn_on: ota_mode
+        - logger.log: "OTA mode enabled via MQTT retained message"
+    - topic: greenhouse/soilbat${device_number}/ota_mode/set
+      payload: "OFF"
+      qos: 1
+      then:
+        - switch.turn_off: ota_mode
+        - logger.log: "OTA mode disabled via MQTT retained message"
 
 # Deep sleep configuration
 deep_sleep:
@@ -103,7 +142,7 @@ sensor:
     pin: ${battery_pin}
     name: "Battery Voltage"
     id: battery_voltage
-    attenuation: 11dB
+    attenuation: 12db
     filters:
       - multiply: 2.0  # Adjust based on your voltage divider
       - sliding_window_moving_average:

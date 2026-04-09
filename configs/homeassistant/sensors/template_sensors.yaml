@@ -1,17 +1,17 @@
 # Template sensors for calculated values
 sensor:
   # ============== SOIL MONITOR 1 BATTERY CALCULATIONS ==============
-  # Battery discharge rate
+  # Battery discharge rate (based on change since last charge)
   - name: "Greenhouse Soil 1 Battery Discharge Rate"
     unique_id: greenhouse_soil_1_battery_discharge_rate
     unit_of_measurement: "%/day"
     state: >
-      {% set battery = states('sensor.greenhouse_soil_1_battery_level') | float(100) %}
-      {% set prev_battery = state_attr('sensor.greenhouse_soil_1_battery_level', 'last_changed') %}
-      {% if prev_battery %}
-        {% set hours_elapsed = (now() - prev_battery).total_seconds() / 3600 %}
-        {% if hours_elapsed > 0 %}
-          {{ ((100 - battery) / hours_elapsed * 24) | round(1) }}
+      {% set battery = states('sensor.greenhouse_soil_1_battery_level') | float(-1) %}
+      {% set last_charge = states('input_datetime.soil_monitor_1_last_charge') %}
+      {% if battery >= 0 and last_charge not in ['unknown', 'unavailable'] %}
+        {% set days_since_charge = ((now() - as_datetime(last_charge)).total_seconds() / 86400) %}
+        {% if days_since_charge > 0.1 %}
+          {{ ((100 - battery) / days_since_charge) | round(1) }}
         {% else %}
           0
         {% endif %}
@@ -78,17 +78,17 @@ sensor:
     icon: mdi:calendar-clock
 
   # ============== SOIL MONITOR 2 BATTERY CALCULATIONS ==============
-  # Battery discharge rate
+  # Battery discharge rate (based on change since last charge)
   - name: "Greenhouse Soil 2 Battery Discharge Rate"
     unique_id: greenhouse_soil_2_battery_discharge_rate
     unit_of_measurement: "%/day"
     state: >
-      {% set battery = states('sensor.greenhouse_soil_2_battery_level') | float(100) %}
-      {% set prev_battery = state_attr('sensor.greenhouse_soil_2_battery_level', 'last_changed') %}
-      {% if prev_battery %}
-        {% set hours_elapsed = (now() - prev_battery).total_seconds() / 3600 %}
-        {% if hours_elapsed > 0 %}
-          {{ ((100 - battery) / hours_elapsed * 24) | round(1) }}
+      {% set battery = states('sensor.greenhouse_soil_2_battery_level') | float(-1) %}
+      {% set last_charge = states('input_datetime.soil_monitor_2_last_charge') %}
+      {% if battery >= 0 and last_charge not in ['unknown', 'unavailable'] %}
+        {% set days_since_charge = ((now() - as_datetime(last_charge)).total_seconds() / 86400) %}
+        {% if days_since_charge > 0.1 %}
+          {{ ((100 - battery) / days_since_charge) | round(1) }}
         {% else %}
           0
         {% endif %}
@@ -153,3 +153,53 @@ sensor:
         unknown
       {% endif %}
     icon: mdi:calendar-clock
+
+# ============== TEMPLATE BINARY SENSORS ==============
+binary_sensor:
+  # --- Soil Monitor 1 ---
+  - name: "Greenhouse Soil 1 Low Battery"
+    unique_id: greenhouse_soil_1_low_battery
+    device_class: battery
+    state: >
+      {{ states('sensor.greenhouse_soil_1_battery_level') | float(100) < 20 }}
+
+  - name: "Greenhouse Soil 1 Extended Offline"
+    unique_id: greenhouse_soil_1_extended_offline
+    device_class: problem
+    state: >
+      {% set last_update = states.sensor.greenhouse_soil_1_battery_voltage.last_changed %}
+      {% if last_update %}
+        {{ ((now() - last_update).total_seconds() / 60) > 30 }}
+      {% else %}
+        false
+      {% endif %}
+
+  - name: "Greenhouse Soil 1 Overheating"
+    unique_id: greenhouse_soil_1_overheating
+    device_class: heat
+    state: >
+      {{ states('sensor.greenhouse_soil_1_device_temperature') | float(0) > 70 }}
+
+  # --- Soil Monitor 2 ---
+  - name: "Greenhouse Soil 2 Low Battery"
+    unique_id: greenhouse_soil_2_low_battery
+    device_class: battery
+    state: >
+      {{ states('sensor.greenhouse_soil_2_battery_level') | float(100) < 20 }}
+
+  - name: "Greenhouse Soil 2 Extended Offline"
+    unique_id: greenhouse_soil_2_extended_offline
+    device_class: problem
+    state: >
+      {% set last_update = states.sensor.greenhouse_soil_2_battery_voltage.last_changed %}
+      {% if last_update %}
+        {{ ((now() - last_update).total_seconds() / 60) > 30 }}
+      {% else %}
+        false
+      {% endif %}
+
+  - name: "Greenhouse Soil 2 Overheating"
+    unique_id: greenhouse_soil_2_overheating
+    device_class: heat
+    state: >
+      {{ states('sensor.greenhouse_soil_2_device_temperature') | float(0) > 70 }}

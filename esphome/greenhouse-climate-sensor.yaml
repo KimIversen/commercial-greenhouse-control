@@ -10,14 +10,20 @@ esphome:
   comment: "Xiao ESP32C3 with dual DHT22 sensors (MQTT)"
   
 esp32:
-  board: esp32-c3-devkitm-1
+  board: seeed_xiao_esp32c3
   framework:
     type: arduino
 
 # Enable logging
 logger:
   level: INFO
-  
+  logs:
+    sensor: WARN
+    mqtt: INFO
+    wifi: INFO
+    api: WARN
+    ota: INFO
+
 # Enable Home Assistant API
 api:
   encryption:

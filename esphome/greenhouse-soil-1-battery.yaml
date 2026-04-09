@@ -316,11 +316,9 @@ sensor:
           retain: true
 
   # -------- DS18B20 Temperature Sensors --------
-  # NOTE: To discover sensor addresses, comment out the address lines below and check logs
-  # Then add the discovered addresses back
   - platform: dallas_temp
     one_wire_id: gpio_one_wire_bus
-    # address: 0x0000000000000000  # TODO: Add actual address after discovery
+    address: 0x9e00000052f08e28
     name: "Soil Temperature 1"
     id: soil_temp_1
     unit_of_measurement: "°C"
@@ -336,7 +334,7 @@ sensor:
 
   - platform: dallas_temp
     one_wire_id: gpio_one_wire_bus
-    # address: 0x0000000000000000  # TODO: Add actual address after discovery
+    address: 0x2700000054e56f28
     name: "Soil Temperature 2"
     id: soil_temp_2
     unit_of_measurement: "°C"
@@ -488,21 +486,6 @@ text_sensor:
       }
     entity_category: diagnostic
 
-  # -------- Dallas Sensor Address Discovery --------
-  # This will show the addresses of all connected Dallas sensors in the logs
-  - platform: template
-    name: "Dallas Sensor Addresses"
-    id: dallas_addresses
-    lambda: |-
-      std::string addresses = "Found Dallas sensors at: ";
-      auto sensors = id(gpio_one_wire_bus)->get_sensors();
-      for (auto &sensor : sensors) {
-        addresses += "\n - 0x" + format_hex(sensor);
-      }
-      ESP_LOGI("dallas", "%s", addresses.c_str());
-      return {addresses};
-    entity_category: diagnostic
-    update_interval: 30s  # Only check periodically
 
 switch:
   # -------- OTA Mode Control --------

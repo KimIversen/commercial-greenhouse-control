@@ -1,371 +1,148 @@
-# Greenhouse Control System Makefile
-# Usage: make <target>
+# Greenhouse Control System - Run everything from your Mac
+#
+# First-time setup:
+#   1. Add to ~/.ssh/config:
+#        Host greenhouse
+#          HostName 192.168.10.105
+#          User greenhouse
+#   2. Copy your SSH key: ssh-copy-id greenhouse
+#   3. make deploy
 
-# Configuration
-GITHUB_USER := KimIversen
-REPO_NAME := commercial-greenhouse-control
-GITHUB_URL := https://raw.githubusercontent.com/$(GITHUB_USER)/$(REPO_NAME)/main
-COMPOSE_FILE := docker-compose.yml
+# Connection
+SERVER       := greenhouse
+SERVER_DIR   := /opt/greenhouse
+SSH          := ssh $(SERVER)
+RSYNC        := rsync -avz --delete
 
-# Colors for output
-GREEN := \033[0;32m
-YELLOW := \033[1;33m
-RED := \033[0;31m
-NC := \033[0m # No Color
+.PHONY: help deploy deploy-ha deploy-esphome deploy-compose ssh status logs health backup restart restart-ha
 
-.PHONY: help update update-makefile update-configs update-scripts restart-all status logs backup health check-updates install-make
-
-# Default target
 help:
-	@echo "$(GREEN)Greenhouse Control System Management$(NC)"
-	@echo "====================================="
+	@echo "Greenhouse Control System"
+	@echo "========================="
 	@echo ""
-	@echo "$(YELLOW)Available commands:$(NC)"
-	@echo "  $(GREEN)make update$(NC)          - Update all configs and restart services"
-	@echo "  $(GREEN)make update-makefile$(NC) - Update Makefile from GitHub"
-	@echo "  $(GREEN)make update-configs$(NC)  - Update configuration files only"
-	@echo "  $(GREEN)make update-scripts$(NC)  - Update scripts only"
-	@echo "  $(GREEN)make restart-all$(NC)     - Restart all Docker services"
-	@echo "  $(GREEN)make status$(NC)          - Show status of all services"
-	@echo "  $(GREEN)make logs$(NC)            - Show recent logs from all services"
-	@echo "  $(GREEN)make health$(NC)          - Check system health"
-	@echo "  $(GREEN)make backup$(NC)          - Run manual backup"
-	@echo "  $(GREEN)make check-updates$(NC)   - Check for available updates"
-	@echo "  $(GREEN)make install-make$(NC)    - Install make if not present"
+	@echo "Deploy (push changes from Mac to server):"
+	@echo "  make deploy          - Push all configs and restart changed services"
+	@echo "  make deploy-ha       - Push HA config and restart HA"
+	@echo "  make deploy-esphome  - Push ESPHome configs only"
+	@echo "  make deploy-compose  - Push docker-compose.yml and recreate services"
 	@echo ""
-	@echo "$(YELLOW)Examples:$(NC)"
-	@echo "  make update              # Update everything and restart"
-	@echo "  make logs SERVICE=homeassistant  # Show logs for specific service"
-	@echo "  make status              # Check if all services are running"
+	@echo "Server commands (run remotely via SSH):"
+	@echo "  make ssh             - SSH into the server"
+	@echo "  make status          - Show running services"
+	@echo "  make logs            - Tail all logs"
+	@echo "  make logs-ha         - Tail Home Assistant logs"
+	@echo "  make health          - System health check"
+	@echo "  make backup          - Run backup now"
+	@echo "  make restart         - Restart all services"
+	@echo "  make restart-ha      - Restart Home Assistant only"
+	@echo "  make db              - Open MariaDB shell (via SSH tunnel)"
+	@echo ""
+	@echo "First-time setup:"
+	@echo "  make setup-ssh       - Configure SSH key access"
 
-# Main update command - updates everything and restarts
-update: check-updates update-makefile update-configs update-scripts restart-all status
-	@echo "$(GREEN)✅ Full system update completed!$(NC)"
+# --- Deploy commands (Mac -> Server via rsync) ---
 
-# Update Makefile itself
-update-makefile:
-	@echo "$(YELLOW)📥 Updating Makefile from GitHub...$(NC)"
-	@curl -s -o Makefile.new $(GITHUB_URL)/Makefile
-	@if [ -f Makefile.new ]; then \
-		mv Makefile Makefile.backup.$$(date +%Y%m%d_%H%M%S) 2>/dev/null || true; \
-		mv Makefile.new Makefile; \
-		echo "✅ Makefile updated"; \
-	else \
-		echo "$(RED)❌ Failed to download Makefile$(NC)"; \
-	fi
+deploy: deploy-compose deploy-ha deploy-esphome deploy-scripts
+	@echo ""
+	@echo "All configs deployed. Restarting services..."
+	$(SSH) "cd $(SERVER_DIR) && docker compose up -d"
+	@echo "Done."
 
-# Update configuration files
-update-configs:
-	@echo "$(YELLOW)📥 Updating configuration files...$(NC)"
-	@mkdir -p config/homeassistant config/mariadb config/mosquitto
-	
-	@echo "Downloading Home Assistant configuration..."
-	@curl -s -o config/homeassistant/configuration.yaml.new $(GITHUB_URL)/configs/homeassistant/configuration.yaml
-	@if [ -f config/homeassistant/configuration.yaml.new ]; then \
-		mv config/homeassistant/configuration.yaml config/homeassistant/configuration.yaml.backup.$$(date +%Y%m%d_%H%M%S) 2>/dev/null || true; \
-		mv config/homeassistant/configuration.yaml.new config/homeassistant/configuration.yaml; \
-		echo "✅ Home Assistant configuration updated"; \
-	else \
-		echo "$(RED)❌ Failed to download Home Assistant configuration$(NC)"; \
-	fi
-	
-	@echo "Downloading Home Assistant Lovelace dashboard..."
-	@curl -s -o config/homeassistant/ui-lovelace.yaml.new $(GITHUB_URL)/configs/homeassistant/ui-lovelace.yaml
-	@if [ -f config/homeassistant/ui-lovelace.yaml.new ]; then \
-		mv config/homeassistant/ui-lovelace.yaml config/homeassistant/ui-lovelace.yaml.backup.$$(date +%Y%m%d_%H%M%S) 2>/dev/null || true; \
-		mv config/homeassistant/ui-lovelace.yaml.new config/homeassistant/ui-lovelace.yaml; \
-		echo "✅ Home Assistant Lovelace dashboard updated"; \
-	else \
-		echo "$(RED)❌ Failed to download Home Assistant Lovelace dashboard$(NC)"; \
-	fi
-	
-	@echo "Downloading MQTT sensor configuration..."
-	@curl -s -o config/homeassistant/mqtt.yaml.new $(GITHUB_URL)/configs/homeassistant/mqtt.yaml
-	@if [ -f config/homeassistant/mqtt.yaml.new ]; then \
-		mv config/homeassistant/mqtt.yaml config/homeassistant/mqtt.yaml.backup.$$(date +%Y%m%d_%H%M%S) 2>/dev/null || true; \
-		mv config/homeassistant/mqtt.yaml.new config/homeassistant/mqtt.yaml; \
-		echo "✅ MQTT sensor configuration updated"; \
-	else \
-		echo "$(RED)❌ Failed to download MQTT sensor configuration$(NC)"; \
-	fi
-	
-	@echo "Downloading sensors directory..."
-	@mkdir -p config/homeassistant/sensors
-	
-	@echo "  - System sensors..."
-	@curl -s -o config/homeassistant/sensors/system_sensors.yaml.new $(GITHUB_URL)/configs/homeassistant/sensors/system_sensors.yaml
-	@if [ -f config/homeassistant/sensors/system_sensors.yaml.new ]; then \
-		mv config/homeassistant/sensors/system_sensors.yaml config/homeassistant/sensors/system_sensors.yaml.backup.$$(date +%Y%m%d_%H%M%S) 2>/dev/null || true; \
-		mv config/homeassistant/sensors/system_sensors.yaml.new config/homeassistant/sensors/system_sensors.yaml; \
-		echo "    ✅ System sensors updated"; \
-	else \
-		echo "    $(RED)❌ Failed to download system sensors$(NC)"; \
-	fi
-	
-	@echo "  - Binary sensors..."
-	@curl -s -o config/homeassistant/sensors/binary_sensors.yaml.new $(GITHUB_URL)/configs/homeassistant/sensors/binary_sensors.yaml
-	@if [ -f config/homeassistant/sensors/binary_sensors.yaml.new ]; then \
-		mv config/homeassistant/sensors/binary_sensors.yaml config/homeassistant/sensors/binary_sensors.yaml.backup.$$(date +%Y%m%d_%H%M%S) 2>/dev/null || true; \
-		mv config/homeassistant/sensors/binary_sensors.yaml.new config/homeassistant/sensors/binary_sensors.yaml; \
-		echo "    ✅ Binary sensors updated"; \
-	else \
-		echo "    $(RED)❌ Failed to download binary sensors$(NC)"; \
-	fi
-	
-	@echo "  - Template sensors..."
-	@curl -s -o config/homeassistant/sensors/template_sensors.yaml.new $(GITHUB_URL)/configs/homeassistant/sensors/template_sensors.yaml
-	@if [ -f config/homeassistant/sensors/template_sensors.yaml.new ]; then \
-		mv config/homeassistant/sensors/template_sensors.yaml config/homeassistant/sensors/template_sensors.yaml.backup.$$(date +%Y%m%d_%H%M%S) 2>/dev/null || true; \
-		mv config/homeassistant/sensors/template_sensors.yaml.new config/homeassistant/sensors/template_sensors.yaml; \
-		echo "    ✅ Template sensors updated"; \
-	else \
-		echo "    $(RED)❌ Failed to download template sensors$(NC)"; \
-	fi
-	
-	@echo "  - Input helpers..."
-	@curl -s -o config/homeassistant/sensors/input_helpers.yaml.new $(GITHUB_URL)/configs/homeassistant/sensors/input_helpers.yaml
-	@if [ -f config/homeassistant/sensors/input_helpers.yaml.new ]; then \
-		mv config/homeassistant/sensors/input_helpers.yaml config/homeassistant/sensors/input_helpers.yaml.backup.$$(date +%Y%m%d_%H%M%S) 2>/dev/null || true; \
-		mv config/homeassistant/sensors/input_helpers.yaml.new config/homeassistant/sensors/input_helpers.yaml; \
-		echo "    ✅ Input helpers updated"; \
-	else \
-		echo "    $(RED)❌ Failed to download input helpers$(NC)"; \
-	fi
-	
-	@echo "  - Input datetime..."
-	@curl -s -o config/homeassistant/sensors/input_datetime.yaml.new $(GITHUB_URL)/configs/homeassistant/sensors/input_datetime.yaml
-	@if [ -f config/homeassistant/sensors/input_datetime.yaml.new ]; then \
-		mv config/homeassistant/sensors/input_datetime.yaml config/homeassistant/sensors/input_datetime.yaml.backup.$$(date +%Y%m%d_%H%M%S) 2>/dev/null || true; \
-		mv config/homeassistant/sensors/input_datetime.yaml.new config/homeassistant/sensors/input_datetime.yaml; \
-		echo "    ✅ Input datetime updated"; \
-	else \
-		echo "    $(RED)❌ Failed to download input datetime$(NC)"; \
-	fi
-	
-	@echo "  - Input buttons..."
-	@curl -s -o config/homeassistant/sensors/input_buttons.yaml.new $(GITHUB_URL)/configs/homeassistant/sensors/input_buttons.yaml
-	@if [ -f config/homeassistant/sensors/input_buttons.yaml.new ]; then \
-		mv config/homeassistant/sensors/input_buttons.yaml config/homeassistant/sensors/input_buttons.yaml.backup.$$(date +%Y%m%d_%H%M%S) 2>/dev/null || true; \
-		mv config/homeassistant/sensors/input_buttons.yaml.new config/homeassistant/sensors/input_buttons.yaml; \
-		echo "    ✅ Input buttons updated"; \
-	else \
-		echo "    $(RED)❌ Failed to download input buttons$(NC)"; \
-	fi
-	
-	@echo "Downloading automations configuration..."
-	@curl -s -o config/homeassistant/automations.yaml.new $(GITHUB_URL)/configs/homeassistant/automations.yaml
-	@if [ -f config/homeassistant/automations.yaml.new ]; then \
-		mv config/homeassistant/automations.yaml config/homeassistant/automations.yaml.backup.$$(date +%Y%m%d_%H%M%S) 2>/dev/null || true; \
-		mv config/homeassistant/automations.yaml.new config/homeassistant/automations.yaml; \
-		echo "✅ Automations configuration updated"; \
-	else \
-		echo "$(RED)❌ Failed to download automations configuration$(NC)"; \
-	fi
-	
-	@echo "Downloading scripts configuration..."
-	@curl -s -o config/homeassistant/scripts.yaml.new $(GITHUB_URL)/configs/homeassistant/scripts.yaml
-	@if [ -f config/homeassistant/scripts.yaml.new ]; then \
-		mv config/homeassistant/scripts.yaml config/homeassistant/scripts.yaml.backup.$$(date +%Y%m%d_%H%M%S) 2>/dev/null || true; \
-		mv config/homeassistant/scripts.yaml.new config/homeassistant/scripts.yaml; \
-		echo "✅ Scripts configuration updated"; \
-	else \
-		echo "$(RED)❌ Failed to download scripts configuration$(NC)"; \
-	fi
-	
-	@echo "Downloading Docker Compose configuration..."
-	@curl -s -o docker-compose.yml.new $(GITHUB_URL)/configs/docker-compose.yml
-	@if [ -f docker-compose.yml.new ]; then \
-		mv docker-compose.yml docker-compose.yml.backup.$$(date +%Y%m%d_%H%M%S) 2>/dev/null || true; \
-		mv docker-compose.yml.new docker-compose.yml; \
-		echo "✅ Docker Compose configuration updated"; \
-	else \
-		echo "$(RED)❌ Failed to download Docker Compose configuration$(NC)"; \
-	fi
-	
-	@echo "Downloading MariaDB configuration..."
-	@curl -s -o config/mariadb/my.cnf.new $(GITHUB_URL)/configs/mariadb/my.cnf
-	@if [ -f config/mariadb/my.cnf.new ]; then \
-		mv config/mariadb/my.cnf config/mariadb/my.cnf.backup.$$(date +%Y%m%d_%H%M%S) 2>/dev/null || true; \
-		mv config/mariadb/my.cnf.new config/mariadb/my.cnf; \
-		echo "✅ MariaDB configuration updated"; \
-	else \
-		echo "$(RED)❌ Failed to download MariaDB configuration$(NC)"; \
-	fi
+deploy-ha:
+	@echo "Deploying Home Assistant config..."
+	$(RSYNC) \
+		--exclude='secrets.yaml' \
+		--exclude='.storage/' \
+		--exclude='*.log' \
+		--exclude='*.db' \
+		--exclude='home-assistant_v2.db*' \
+		--exclude='tts/' \
+		--exclude='blueprints/' \
+		--exclude='custom_components/' \
+		--exclude='.cloud/' \
+		configs/homeassistant/ $(SERVER):$(SERVER_DIR)/config/homeassistant/
+	@echo "Restarting Home Assistant..."
+	$(SSH) "cd $(SERVER_DIR) && docker compose restart homeassistant"
+	@echo "Done."
 
-# Update scripts
-update-scripts:
-	@echo "$(YELLOW)📥 Updating scripts...$(NC)"
-	@mkdir -p scripts
-	
-	@echo "Downloading backup script..."
-	@curl -s -o scripts/backup.sh.new $(GITHUB_URL)/scripts/backup.sh
-	@if [ -f scripts/backup.sh.new ]; then \
-		mv scripts/backup.sh scripts/backup.sh.backup.$$(date +%Y%m%d_%H%M%S) 2>/dev/null || true; \
-		mv scripts/backup.sh.new scripts/backup.sh; \
-		chmod +x scripts/backup.sh; \
-		echo "✅ Backup script updated"; \
-	else \
-		echo "$(RED)❌ Failed to download backup script$(NC)"; \
-	fi
-	
-	@echo "Downloading system monitor script..."
-	@curl -s -o scripts/system-monitor.sh.new $(GITHUB_URL)/scripts/system-monitor.sh
-	@if [ -f scripts/system-monitor.sh.new ]; then \
-		mv scripts/system-monitor.sh scripts/system-monitor.sh.backup.$$(date +%Y%m%d_%H%M%S) 2>/dev/null || true; \
-		mv scripts/system-monitor.sh.new scripts/system-monitor.sh; \
-		chmod +x scripts/system-monitor.sh; \
-		echo "✅ System monitor script updated"; \
-	else \
-		echo "$(RED)❌ Failed to download system monitor script$(NC)"; \
-	fi
+deploy-esphome:
+	@echo "Deploying ESPHome configs..."
+	$(RSYNC) \
+		--exclude='secrets.yaml' \
+		--exclude='.esphome/' \
+		esphome/ $(SERVER):$(SERVER_DIR)/config/esphome/
+	@echo "Done."
 
-# Restart all services
-restart-all:
-	@echo "$(YELLOW)🔄 Restarting all services...$(NC)"
-	@docker-compose down
-	@echo "Waiting for clean shutdown..."
-	@sleep 5
-	@docker-compose up -d
-	@echo "Waiting for services to start..."
-	@sleep 30
-	@echo "$(GREEN)✅ All services restarted$(NC)"
+deploy-compose:
+	@echo "Deploying docker-compose.yml..."
+	rsync -avz configs/docker-compose.yml $(SERVER):$(SERVER_DIR)/docker-compose.yml
 
-# Show status of all services
+deploy-scripts:
+	@echo "Deploying scripts..."
+	rsync -avz scripts/backup.sh scripts/system-monitor.sh $(SERVER):$(SERVER_DIR)/scripts/
+	$(SSH) "chmod +x $(SERVER_DIR)/scripts/*.sh"
+
+# --- Server commands (via SSH) ---
+
+ssh:
+	@ssh $(SERVER)
+
 status:
-	@echo "$(YELLOW)📊 Service Status:$(NC)"
-	@docker-compose ps
-	@echo ""
-	@echo "$(YELLOW)🔍 Health Check:$(NC)"
-	@docker-compose ps --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}" | grep -E "(Up|Exited|Restarting)"
+	@$(SSH) "cd $(SERVER_DIR) && docker compose ps"
 
-# Show logs from services
 logs:
-	@if [ -n "$(SERVICE)" ]; then \
-		echo "$(YELLOW)📋 Logs for $(SERVICE):$(NC)"; \
-		docker-compose logs --tail=50 $(SERVICE); \
-	else \
-		echo "$(YELLOW)📋 Recent logs from all services:$(NC)"; \
-		docker-compose logs --tail=20; \
-	fi
+	@$(SSH) "cd $(SERVER_DIR) && docker compose logs --tail=50 -f"
 
-# Check system health
+logs-ha:
+	@$(SSH) "cd $(SERVER_DIR) && docker compose logs --tail=100 -f homeassistant"
+
+logs-esphome:
+	@$(SSH) "cd $(SERVER_DIR) && docker compose logs --tail=50 -f esphome"
+
+logs-mqtt:
+	@$(SSH) "cd $(SERVER_DIR) && docker compose logs --tail=50 -f mosquitto"
+
 health:
-	@echo "$(YELLOW)🏥 System Health Check:$(NC)"
-	@echo ""
-	@echo "📊 Container Status:"
-	@docker-compose ps --format "table {{.Name}}\t{{.Status}}"
-	@echo ""
-	@echo "💾 Disk Usage:"
-	@df -h / | grep -E "(Filesystem|/dev)"
-	@echo ""
-	@echo "🧠 Memory Usage:"
-	@free -h | grep -E "(Mem|Swap)"
-	@echo ""
-	@echo "⚡ CPU Load:"
-	@uptime
-	@echo ""
-	@echo "🗄️ Database Connection Test:"
-	@if docker exec greenhouse_mariadb mysqladmin ping -h localhost --silent 2>/dev/null; then \
-		echo "$(GREEN)✅ Database: Connected$(NC)"; \
-	else \
-		echo "$(RED)❌ Database: Connection failed$(NC)"; \
-	fi
-	@echo ""
-	@echo "🌐 Home Assistant API Test:"
-	@if curl -f http://localhost:8123/api/ >/dev/null 2>&1; then \
-		echo "$(GREEN)✅ Home Assistant: API responding$(NC)"; \
-	else \
-		echo "$(RED)❌ Home Assistant: API not responding$(NC)"; \
-	fi
+	@$(SSH) 'echo "=== Services ===" && \
+		cd $(SERVER_DIR) && docker compose ps && \
+		echo "" && echo "=== Disk ===" && \
+		df -h / && \
+		echo "" && echo "=== Memory ===" && \
+		free -h && \
+		echo "" && echo "=== Load ===" && \
+		uptime && \
+		echo "" && echo "=== DB ===" && \
+		docker exec greenhouse_mariadb mysqladmin ping -h localhost --silent 2>/dev/null && echo "MariaDB: OK" || echo "MariaDB: DOWN" && \
+		echo "" && echo "=== HA ===" && \
+		curl -sf http://localhost:8123/manifest.json >/dev/null && echo "Home Assistant: OK" || echo "Home Assistant: DOWN"'
 
-# Run manual backup
 backup:
-	@echo "$(YELLOW)💾 Running manual backup...$(NC)"
-	@if [ -f scripts/backup.sh ]; then \
-		./scripts/backup.sh; \
-		echo "$(GREEN)✅ Backup completed$(NC)"; \
-	else \
-		echo "$(RED)❌ Backup script not found$(NC)"; \
-	fi
+	@$(SSH) "$(SERVER_DIR)/scripts/backup.sh"
 
-# Check for available updates
-check-updates:
-	@echo "$(YELLOW)🔍 Checking for updates...$(NC)"
-	@echo "Current repository: $(GITHUB_URL)"
-	@echo "Checking GitHub connectivity..."
-	# Uses curl’s --write-out to capture the final status code after redirects
-	@if code=$$(curl -s -o /dev/null -w '%{http_code}' -L $(GITHUB_URL)/README.md); \
-   	[ "$$code" -lt 400 ]; then \
-        	printf '%b\n' '$(GREEN)✅ GitHub repository accessible$(NC)'; \
-   	else \
-        	printf '%b\n' '$(RED)❌ GitHub returned HTTP $$code$(NC)'; \
-        	exit 1; \
-   	fi
+restart:
+	@echo "Restarting all services..."
+	@$(SSH) "cd $(SERVER_DIR) && docker compose restart"
 
-# Install make if not present
-install-make:
-	@echo "$(YELLOW)📦 Installing make...$(NC)"
-	@if command -v make >/dev/null 2>&1; then \
-		echo "$(GREEN)✅ make is already installed$(NC)"; \
-	else \
-		echo "Installing make..."; \
-		sudo apt update && sudo apt install -y make; \
-		echo "$(GREEN)✅ make installed successfully$(NC)"; \
-	fi
+restart-ha:
+	@$(SSH) "cd $(SERVER_DIR) && docker compose restart homeassistant"
 
-# Quick shortcuts
-restart: restart-all
-update-all: update
-ps: status
-log: logs
+restart-mqtt:
+	@$(SSH) "cd $(SERVER_DIR) && docker compose restart mosquitto"
 
-# Advanced targets
-clean-containers:
-	@echo "$(YELLOW)🧹 Cleaning unused Docker containers...$(NC)"
-	@docker system prune -f
-	@echo "$(GREEN)✅ Cleanup completed$(NC)"
+# Access MariaDB for AI/analysis work via SSH tunnel
+# Usage: make db  (then connect with any SQL client to localhost:3307)
+db:
+	@echo "Opening SSH tunnel to MariaDB on localhost:3307..."
+	@echo "Connect your SQL client to localhost:3307"
+	@echo "Credentials are in the server's .env file"
+	@echo "Press Ctrl+C to close the tunnel"
+	@ssh -N -L 3307:localhost:3306 $(SERVER)
 
-pull-images:
-	@echo "$(YELLOW)📥 Pulling latest Docker images...$(NC)"
-	@docker-compose pull
-	@echo "$(GREEN)✅ Images updated$(NC)"
+# --- First-time setup ---
 
-# Development targets
-dev-update: update-configs
-	@echo "$(YELLOW)🔧 Development update (configs only, no restart)$(NC)"
-	@echo "$(GREEN)✅ Configs updated - restart manually when ready$(NC)"
-
-# Show environment info
-env-info:
-	@echo "$(YELLOW)🔧 Environment Information:$(NC)"
-	@echo "User: $$(whoami)"
-	@echo "Directory: $$(pwd)"
-	@echo "Docker Compose version: $$(docker-compose --version)"
-	@echo "Docker version: $$(docker --version)"
-	@echo "Make version: $$(make --version | head -n1)"
-	@echo "GitHub URL: $(GITHUB_URL)"
-
-# Show detailed help
-help-detailed: help
+setup-ssh:
+	@echo "Setting up SSH key access to greenhouse server..."
+	@echo "You may be asked for the greenhouse password."
+	@ssh-copy-id -i ~/.ssh/{bitbucket_mb_air_15} $(SERVER)
 	@echo ""
-	@echo "$(YELLOW)Detailed Usage:$(NC)"
-	@echo ""
-	@echo "$(GREEN)Configuration Management:$(NC)"
-	@echo "  make update-configs    - Downloads latest config files from GitHub"
-	@echo "  make update-scripts    - Downloads latest scripts from GitHub"
-	@echo "  make dev-update        - Update configs without restarting (for testing)"
-	@echo ""
-	@echo "$(GREEN)Service Management:$(NC)"
-	@echo "  make restart-all       - Stop and start all Docker containers"
-	@echo "  make pull-images       - Update Docker images to latest versions"
-	@echo "  make clean-containers  - Remove unused Docker containers and images"
-	@echo ""
-	@echo "$(GREEN)Monitoring:$(NC)"
-	@echo "  make status            - Show container status"
-	@echo "  make health           - Comprehensive system health check"
-	@echo "  make logs             - Show logs from all services"
-	@echo "  make logs SERVICE=name - Show logs from specific service"
-	@echo ""
-	@echo "$(GREEN)Maintenance:$(NC)"
-	@echo "  make backup           - Run manual backup"
-	@echo "  make env-info         - Show environment information"
+	@echo "Done. You should now be able to: make ssh"

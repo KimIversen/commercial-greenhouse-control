@@ -31,7 +31,14 @@ esp32:
 # Enable logging
 logger:
   level: INFO
-  
+  logs:
+    sensor: WARN
+    mqtt: INFO
+    wifi: INFO
+    api: WARN
+    ota: INFO
+    deep_sleep: INFO
+
 # Enable Home Assistant API
 api:
   encryption:
@@ -106,7 +113,7 @@ sensor:
     pin: ${battery_pin}
     name: "Battery Voltage"
     id: battery_voltage
-    attenuation: 11dB
+    attenuation: 12db
     filters:
       - multiply: 2.0  # Adjust based on your voltage divider
       - sliding_window_moving_average:
