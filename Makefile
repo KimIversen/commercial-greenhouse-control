@@ -3,7 +3,7 @@
 # First-time setup:
 #   1. Add to ~/.ssh/config:
 #        Host greenhouse
-#          HostName 192.168.10.105
+#          HostName 192.168.10.107
 #          User greenhouse
 #   2. Copy your SSH key: ssh-copy-id greenhouse
 #   3. make deploy
