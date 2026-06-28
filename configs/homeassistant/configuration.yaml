@@ -56,6 +56,8 @@ binary_sensor: !include sensors/binary_sensors.yaml
 
 # Manual controls
 input_button: !include sensors/input_buttons.yaml
+input_number: !include sensors/automation_numbers.yaml
+input_boolean: !include sensors/automation_booleans.yaml
 
 # Shell commands
 shell_command:
