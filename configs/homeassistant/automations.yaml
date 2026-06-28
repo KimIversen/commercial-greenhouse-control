@@ -23,3 +23,66 @@
           entity_id: input_button.manual_backup
   action:
     - service: shell_command.manual_backup
+
+- id: gh_fan_control
+  alias: "GH Fan control (temp/humidity)"
+  mode: single
+  trigger:
+    - platform: state
+      entity_id: [sensor.greenhouse_climate_2_temperature, sensor.greenhouse_climate_2_humidity]
+    - platform: time_pattern
+      minutes: "/5"
+  condition:
+    - condition: state
+      entity_id: input_boolean.gh_automation_enabled
+      state: "on"
+    - condition: state
+      entity_id: binary_sensor.greenhouse_climate_2_device_status
+      state: "on"
+  action:
+    - variables:
+        t: "{{ states('sensor.greenhouse_climate_2_temperature') | float(0) }}"
+        h: "{{ states('sensor.greenhouse_climate_2_humidity') | float(0) }}"
+        on_t: "{{ states('input_number.gh_fan_on_temp') | float(25) }}"
+        off_t: "{{ states('input_number.gh_fan_off_temp') | float(23) }}"
+        h_max: "{{ states('input_number.gh_humidity_max') | float(80) }}"
+        h_off: "{{ states('input_number.gh_humidity_off') | float(72) }}"
+        day: "{{ is_state('sun.sun','above_horizon') }}"
+        fans_on: "{{ is_state('switch.plugg_3_vifte_endevegg_ost','on') }}"
+        want_on: "{{ (t >= on_t) or (h >= h_max) or (not day and h > 85) }}"
+        want_off: "{{ (t <= off_t) and (h <= h_off) and not (not day and h > 85) }}"
+    - choose:
+        - conditions: "{{ want_on and not fans_on }}"
+          sequence:
+            - service: switch.turn_on
+              target: {entity_id: [switch.plugg_3_vifte_endevegg_ost, switch.plugg_5_vifte_endevegg_vest]}
+        - conditions: "{{ want_off and fans_on }}"
+          sequence:
+            - service: switch.turn_off
+              target: {entity_id: [switch.plugg_3_vifte_endevegg_ost, switch.plugg_5_vifte_endevegg_vest]}
+
+- id: gh_fan_circulation
+  alias: "GH Fan circulation (daylight)"
+  mode: single
+  trigger:
+    - platform: time_pattern
+      minutes: "0"
+  condition:
+    - condition: state
+      entity_id: input_boolean.gh_automation_enabled
+      state: "on"
+    - condition: state
+      entity_id: sun.sun
+      state: "above_horizon"
+    - condition: state
+      entity_id: switch.plugg_3_vifte_endevegg_ost
+      state: "off"
+  action:
+    - service: switch.turn_on
+      target: {entity_id: [switch.plugg_3_vifte_endevegg_ost, switch.plugg_5_vifte_endevegg_vest]}
+    - delay: "00:10:00"
+    # only turn back off if the climate automation didn't latch them on for cooling
+    - condition: template
+      value_template: "{{ (states('sensor.greenhouse_climate_2_temperature')|float(0)) < (states('input_number.gh_fan_on_temp')|float(25)) and (states('sensor.greenhouse_climate_2_humidity')|float(0)) < (states('input_number.gh_humidity_max')|float(80)) }}"
+    - service: switch.turn_off
+      target: {entity_id: [switch.plugg_3_vifte_endevegg_ost, switch.plugg_5_vifte_endevegg_vest]}
