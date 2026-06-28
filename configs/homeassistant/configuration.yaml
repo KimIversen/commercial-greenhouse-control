@@ -8,46 +8,27 @@ homeassistant:
   time_zone: Europe/Oslo
   country: "NO"
 
-# HTTP with security
+# HTTP
 http:
-  use_x_forwarded_for: true
-  trusted_proxies:
-    - 172.20.0.0/16
-    - 127.0.0.1
   ip_ban_enabled: true
   login_attempts_threshold: 5
 
-# Database – High-performance MariaDB
+# Database - store everything for AI analysis later
 recorder:
   db_url: !secret db_url
   purge_keep_days: 365
   auto_purge: true
   commit_interval: 1
 
-# Cloud integration
-cloud:
-
-# MQTT configuration - all sensors moved to mqtt.yaml
+# MQTT
 mqtt: !include mqtt.yaml
-
-# Notifications
-notify:
-  - platform: smtp
-    name: critical_alerts
-    server: !secret smtp_server
-    port: 587
-    sender: !secret smtp_sender
-    username: !secret smtp_username
-    password: !secret smtp_password
-    recipient:
-      - !secret admin_email
 
 # Essential components
 api:
+# Home Assistant Cloud (Nabu Casa) - remote access, no port forwarding required
+cloud:
 logger:
   default: warning
-  logs:
-    homeassistant.components.recorder: info
 system_health:
 mobile_app:
 frontend:
@@ -56,34 +37,26 @@ history:
 
 # Lovelace YAML mode
 lovelace:
-  mode: yaml
+  dashboards:
+    lovelace:
+      mode: yaml
+      filename: ui-lovelace.yaml
+      title: Greenhouse
+      icon: mdi:greenhouse
+      show_in_sidebar: true
 
-# Include all configuration files
+# Include configuration files
 automation: !include automations.yaml
 script: !include scripts.yaml
 scene: !include scenes.yaml
 
-# Include sensor components directly
+# System monitoring
 sensor: !include sensors/system_sensors.yaml
 binary_sensor: !include sensors/binary_sensors.yaml
-template: !include sensors/template_sensors.yaml
-input_boolean: !include sensors/input_helpers.yaml
-input_datetime: !include sensors/input_datetime.yaml
+
+# Manual controls
 input_button: !include sensors/input_buttons.yaml
 
-# Shell commands for container monitoring and backup
+# Shell commands
 shell_command:
-  check_homeassistant_container: 'docker ps --format "table {{.Names}}\t{{.Status}}" | grep homeassistant | grep -q "Up" && echo "online" || echo "offline"'
-  check_mariadb_container: 'docker ps --format "table {{.Names}}\t{{.Status}}" | grep mariadb | grep -q "Up" && echo "online" || echo "offline"'
-  check_mosquitto_container: 'docker ps --format "table {{.Names}}\t{{.Status}}" | grep mosquitto | grep -q "Up" && echo "online" || echo "offline"'
-  check_esphome_container: 'docker ps --format "table {{.Names}}\t{{.Status}}" | grep esphome | grep -q "Up" && echo "online" || echo "offline"'
-  manual_backup: "/config/scripts/backup.sh"
-
-
-# Zones
-zone:
-  - name: Greenhouse
-    latitude: !secret latitude
-    longitude: !secret longitude
-    radius: 100
-    icon: mdi:greenhouse
+  manual_backup: "/opt/greenhouse/scripts/backup.sh"
