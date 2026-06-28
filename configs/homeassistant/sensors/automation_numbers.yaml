@@ -4,7 +4,6 @@ gh_fan_on_temp:
   max: 35
   step: 0.5
   unit_of_measurement: "°C"
-  initial: 25
   icon: mdi:fan
 
 gh_fan_off_temp:
@@ -13,7 +12,6 @@ gh_fan_off_temp:
   max: 33
   step: 0.5
   unit_of_measurement: "°C"
-  initial: 23
   icon: mdi:fan-off
 
 gh_humidity_max:
@@ -22,7 +20,6 @@ gh_humidity_max:
   max: 95
   step: 1
   unit_of_measurement: "%"
-  initial: 80
   icon: mdi:water-percent
 
 gh_humidity_off:
@@ -31,7 +28,6 @@ gh_humidity_off:
   max: 90
   step: 1
   unit_of_measurement: "%"
-  initial: 72
   icon: mdi:water-percent
 
 gh_overheat_temp:
@@ -40,7 +36,6 @@ gh_overheat_temp:
   max: 38
   step: 0.5
   unit_of_measurement: "°C"
-  initial: 30
   icon: mdi:thermometer-alert
 
 gh_overheat_critical:
@@ -49,7 +44,6 @@ gh_overheat_critical:
   max: 45
   step: 0.5
   unit_of_measurement: "°C"
-  initial: 35
   icon: mdi:thermometer-alert
 
 gh_cold_temp:
@@ -58,5 +52,4 @@ gh_cold_temp:
   max: 18
   step: 0.5
   unit_of_measurement: "°C"
-  initial: 12
   icon: mdi:snowflake-alert

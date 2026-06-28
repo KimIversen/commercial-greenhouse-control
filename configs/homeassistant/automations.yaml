@@ -189,6 +189,10 @@
       entity_id: binary_sensor.greenhouse_climate_2_device_status
       to: "unavailable"
       for: "00:15:00"
+  condition:
+    - condition: state
+      entity_id: input_boolean.gh_automation_enabled
+      state: "on"
   action:
     - service: script.gh_notify
       data:
@@ -365,3 +369,23 @@
     - delay: "00:08:00"
     - service: switch.turn_off
       target: {entity_id: switch.plugg_1_vanning}
+
+- id: gh_water_watchdog
+  alias: "GH Watering watchdog (force-off stuck pump)"
+  mode: single
+  trigger:
+    - platform: state
+      entity_id: switch.plugg_1_vanning
+      to: "on"
+      for: "00:22:00"
+  condition:
+    - condition: state
+      entity_id: input_boolean.gh_watering_ha_enabled
+      state: "on"
+  action:
+    - service: switch.turn_off
+      target: {entity_id: switch.plugg_1_vanning}
+    - service: script.gh_notify
+      data:
+        title: "💧 Watering watchdog"
+        message: "Vanning pump was on >22 min — forced off (possible stuck pulse after a restart)."

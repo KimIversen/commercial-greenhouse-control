@@ -1,9 +1,7 @@
 gh_automation_enabled:
   name: "Greenhouse automation enabled"
   icon: mdi:robot
-  initial: true
 
 gh_watering_ha_enabled:
   name: "Greenhouse watering via HA"
   icon: mdi:water-pump
-  initial: false
