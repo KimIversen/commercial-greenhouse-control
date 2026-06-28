@@ -1,2 +1,13 @@
 # Scripts for Greenhouse Control System
-# Add scripts here as needed
+
+gh_notify:
+  alias: "GH Notify"
+  mode: parallel
+  fields:
+    title: {description: "Title"}
+    message: {description: "Message"}
+  sequence:
+    - service: persistent_notification.create
+      data:
+        title: "{{ title }}"
+        message: "{{ message }}"
