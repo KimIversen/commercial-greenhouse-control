@@ -86,3 +86,111 @@
       value_template: "{{ (states('sensor.greenhouse_climate_2_temperature')|float(0)) < (states('input_number.gh_fan_on_temp')|float(25)) and (states('sensor.greenhouse_climate_2_humidity')|float(0)) < (states('input_number.gh_humidity_max')|float(80)) }}"
     - service: switch.turn_off
       target: {entity_id: [switch.plugg_3_vifte_endevegg_ost, switch.plugg_5_vifte_endevegg_vest]}
+
+# ==================== TASK 4: SAFETY ALERTS ====================
+
+- id: gh_alert_overheat
+  alias: "GH Alert overheat"
+  mode: single
+  trigger:
+    - platform: numeric_state
+      entity_id: sensor.greenhouse_climate_2_temperature
+      above: input_number.gh_overheat_temp
+      for: "00:02:00"
+  condition:
+    - condition: state
+      entity_id: input_boolean.gh_automation_enabled
+      state: "on"
+  action:
+    - service: script.gh_notify
+      data:
+        title: "🌡️ Greenhouse hot ({{ states('sensor.greenhouse_climate_2_temperature') }}°C)"
+        message: "Above {{ states('input_number.gh_overheat_temp') }}°C — pollination at risk. Open the roll-up wall."
+    - delay: "00:30:00"   # rate-limit re-fire
+
+- id: gh_alert_overheat_critical
+  alias: "GH Alert overheat critical"
+  mode: single
+  trigger:
+    - platform: numeric_state
+      entity_id: sensor.greenhouse_climate_2_temperature
+      above: input_number.gh_overheat_critical
+      for: "00:01:00"
+  condition:
+    - condition: state
+      entity_id: input_boolean.gh_automation_enabled
+      state: "on"
+  action:
+    - service: script.gh_notify
+      data:
+        title: "🔥 GREENHOUSE OVERHEATING ({{ states('sensor.greenhouse_climate_2_temperature') }}°C)"
+        message: "Critical. Max ventilation now — open wall fully."
+    - delay: "00:15:00"
+
+- id: gh_alert_cold
+  alias: "GH Alert cold"
+  mode: single
+  trigger:
+    - platform: numeric_state
+      entity_id: sensor.greenhouse_climate_2_temperature
+      below: input_number.gh_cold_temp
+      for: "00:05:00"
+  condition:
+    - condition: state
+      entity_id: input_boolean.gh_automation_enabled
+      state: "on"
+  action:
+    - service: script.gh_notify
+      data:
+        title: "❄️ Greenhouse cold ({{ states('sensor.greenhouse_climate_2_temperature') }}°C)"
+        message: "Below {{ states('input_number.gh_cold_temp') }}°C — close the wall / check overnight."
+    - delay: "00:30:00"
+
+# ==================== TASK 5: HUMIDITY ALERT ====================
+
+- id: gh_alert_humidity
+  alias: "GH Alert humidity out of range"
+  mode: single
+  trigger:
+    - platform: numeric_state
+      entity_id: sensor.greenhouse_climate_2_humidity
+      above: 85
+      for: "00:10:00"
+    - platform: numeric_state
+      entity_id: sensor.greenhouse_climate_2_humidity
+      below: 55
+      for: "00:10:00"
+  condition:
+    - condition: state
+      entity_id: input_boolean.gh_automation_enabled
+      state: "on"
+    - condition: state
+      entity_id: sun.sun
+      state: "above_horizon"
+  action:
+    - service: script.gh_notify
+      data:
+        title: "💧 Humidity {{ states('sensor.greenhouse_climate_2_humidity') }}%"
+        message: >-
+          {{ 'High (>85%) — botrytis risk, increase ventilation.' if (states('sensor.greenhouse_climate_2_humidity')|float(0)) > 85 else 'Low (<55%) — stigma may dry, mist/reduce ventilation.' }}
+    - delay: "00:30:00"
+
+# ==================== TASK 6: SENSOR-OFFLINE ALERT ====================
+
+- id: gh_alert_sensor_offline
+  alias: "GH Alert climate sensor offline"
+  mode: single
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.greenhouse_climate_2_device_status
+      to: "off"
+      for: "00:15:00"
+    - platform: state
+      entity_id: binary_sensor.greenhouse_climate_2_device_status
+      to: "unavailable"
+      for: "00:15:00"
+  action:
+    - service: script.gh_notify
+      data:
+        title: "📡 Climate sensor offline"
+        message: "greenhouse-climate-2 has been offline 15 min — automation is running blind."
