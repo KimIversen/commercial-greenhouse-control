@@ -110,3 +110,30 @@ views:
             name: Restart Home Assistant
           - entity: sensor.backup_backup_manager_state
             name: Backup state
+
+  # ==================== AUTOMATION ====================
+  - title: Automation
+    path: automation
+    icon: mdi:robot
+    cards:
+      - type: entities
+        title: Master
+        entities:
+          - entity: input_boolean.gh_automation_enabled
+            name: Automation enabled
+          - entity: switch.plugg_3_vifte_endevegg_ost
+            name: Fan øst
+          - entity: switch.plugg_5_vifte_endevegg_vest
+            name: Fan vest
+          - entity: switch.plugg_1_vanning
+            name: Vanning
+      - type: entities
+        title: Thresholds (tune here)
+        entities:
+          - input_number.gh_fan_on_temp
+          - input_number.gh_fan_off_temp
+          - input_number.gh_humidity_max
+          - input_number.gh_humidity_off
+          - input_number.gh_overheat_temp
+          - input_number.gh_overheat_critical
+          - input_number.gh_cold_temp
