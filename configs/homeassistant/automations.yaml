@@ -49,8 +49,8 @@
         h_off: "{{ states('input_number.gh_humidity_off') | float(72) }}"
         day: "{{ is_state('sun.sun','above_horizon') }}"
         fans_on: "{{ is_state('switch.plugg_3_vifte_endevegg_ost','on') }}"
-        want_on: "{{ (t >= on_t) or (h >= h_max) or (not day and h > 85) }}"
-        want_off: "{{ (t <= off_t) and (h <= h_off) and not (not day and h > 85) }}"
+        want_on: "{{ (t >= on_t) or (day and h >= h_max) or ((not day) and h > 85) }}"
+        want_off: "{{ (t <= off_t) and ((day and h <= h_off) or ((not day) and h <= 83)) }}"
     - choose:
         - conditions: "{{ want_on and not fans_on }}"
           sequence:
