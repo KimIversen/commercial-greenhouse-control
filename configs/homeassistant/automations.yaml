@@ -194,3 +194,46 @@
       data:
         title: "📡 Climate sensor offline"
         message: "greenhouse-climate-2 has been offline 15 min — automation is running blind."
+
+# ==================== TASK 8: ROLL-UP WALL PROMPTS ====================
+
+- id: gh_wall_open_prompt
+  alias: "GH Wall - open prompt"
+  mode: single
+  trigger:
+    - platform: numeric_state
+      entity_id: sensor.greenhouse_climate_2_temperature
+      above: 27
+      for: "00:05:00"
+  condition:
+    - condition: state
+      entity_id: input_boolean.gh_automation_enabled
+      state: "on"
+    - condition: state
+      entity_id: sun.sun
+      state: "above_horizon"
+  action:
+    - service: script.gh_notify
+      data:
+        title: "🪟 Open the roll-up wall"
+        message: "{{ states('sensor.greenhouse_climate_2_temperature') }}°C and climbing — fans alone may not hold it."
+    - delay: "01:00:00"
+
+- id: gh_wall_close_prompt
+  alias: "GH Wall - close prompt"
+  mode: single
+  trigger:
+    - platform: numeric_state
+      entity_id: sensor.greenhouse_climate_2_temperature
+      below: 18
+      for: "00:15:00"
+  condition:
+    - condition: state
+      entity_id: input_boolean.gh_automation_enabled
+      state: "on"
+  action:
+    - service: script.gh_notify
+      data:
+        title: "🪟 Close the roll-up wall"
+        message: "Down to {{ states('sensor.greenhouse_climate_2_temperature') }}°C — close up to hold night target (17–18.5°C)."
+    - delay: "01:00:00"
