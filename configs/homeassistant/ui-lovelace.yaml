@@ -176,7 +176,7 @@ views:
         entity: sensor.gh_vpd
         name: VPD (kPa)
         min: 0
-        max: 2
+        max: 3.5
         needle: true
         severity:
           green: 0.8
