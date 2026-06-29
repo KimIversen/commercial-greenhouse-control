@@ -389,3 +389,33 @@
       data:
         title: "💧 Watering watchdog"
         message: "Vanning pump was on >22 min — forced off (possible stuck pulse after a restart)."
+
+- id: gh_watering_tracker
+  alias: "GH Watering tracker (record last/duration)"
+  mode: queued
+  trigger:
+    - platform: state
+      entity_id: switch.plugg_1_vanning
+      to: "on"
+      id: started
+    - platform: state
+      entity_id: switch.plugg_1_vanning
+      to: "off"
+      id: stopped
+  action:
+    - choose:
+        - conditions: "{{ trigger.id == 'started' }}"
+          sequence:
+            - service: input_datetime.set_datetime
+              target: {entity_id: input_datetime.gh_watering_started}
+              data: {datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"}
+        - conditions: "{{ trigger.id == 'stopped' }}"
+          sequence:
+            - service: input_datetime.set_datetime
+              target: {entity_id: input_datetime.gh_last_watering}
+              data: {datetime: "{{ states('input_datetime.gh_watering_started') }}"}
+            - service: input_number.set_value
+              target: {entity_id: input_number.gh_last_watering_minutes}
+              data:
+                value: >-
+                  {{ ((now().timestamp() - as_timestamp(states('input_datetime.gh_watering_started'))) / 60) | round(0) }}
