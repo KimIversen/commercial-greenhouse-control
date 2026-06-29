@@ -152,7 +152,6 @@ views:
             name: Last duration
           - entity: sensor.gh_next_watering
             name: Next watering
-            secondary_info: last-changed
           - entity: sensor.gh_water_per_plant_24h
             name: Water/plant (24h)
           - entity: sensor.gh_water_per_plant_7d_avg

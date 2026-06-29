@@ -76,12 +76,12 @@ template:
         icon: mdi:water-clock
         state: >-
           {% set sched = [['07:00',20],['09:00',15],['11:00',10],['13:00',10],['15:00',15]] %}
-          {% set ns = namespace(t=none) %}
+          {% set ns = namespace(t=none, d=20) %}
           {% for hm, dur in sched %}
-            {% if ns.t is none and today_at(hm) > now() %}{% set ns.t = today_at(hm) %}{% endif %}
+            {% if ns.t is none and today_at(hm) > now() %}{% set ns.t = today_at(hm) %}{% set ns.d = dur %}{% endif %}
           {% endfor %}
-          {% if ns.t is none %}{% set ns.t = today_at('07:00') + timedelta(days=1) %}{% endif %}
-          {{ ns.t.strftime('%H:%M') }}
+          {% if ns.t is none %}{% set ns.t = today_at('07:00') + timedelta(days=1) %}{% set ns.d = 20 %}{% endif %}
+          {{ ns.t.strftime('%H:%M') }} · {{ ns.d }} min
         attributes:
           duration_min: >-
             {% set sched = [['07:00',20],['09:00',15],['11:00',10],['13:00',10],['15:00',15]] %}
