@@ -137,3 +137,59 @@ views:
           - input_number.gh_overheat_temp
           - input_number.gh_overheat_critical
           - input_number.gh_cold_temp
+
+  # ==================== METRICS ====================
+  - title: Metrics
+    path: metrics
+    icon: mdi:chart-line
+    cards:
+      - type: entities
+        title: 💧 Watering
+        entities:
+          - entity: input_datetime.gh_last_watering
+            name: Last watering
+          - entity: input_number.gh_last_watering_minutes
+            name: Last duration
+          - entity: sensor.gh_next_watering
+            name: Next watering
+            secondary_info: last-changed
+          - entity: sensor.gh_water_per_plant_24h
+            name: Water/plant (24h)
+          - entity: sensor.gh_water_per_plant_7d_avg
+            name: Water/plant (7-day avg)
+      - type: entities
+        title: 🌡️ Climate averages
+        entities:
+          - entity: sensor.gh_temp_avg_24h
+            name: Temp avg (24h)
+          - entity: sensor.gh_temp_avg_7d
+            name: Temp avg (7-day)
+          - entity: sensor.gh_temp_min_24h
+            name: Temp min (24h)
+          - entity: sensor.gh_temp_max_24h
+            name: Temp max (24h)
+          - entity: sensor.gh_humidity_min_24h
+            name: Humidity min (24h)
+          - entity: sensor.gh_humidity_max_24h
+            name: Humidity max (24h)
+      - type: gauge
+        entity: sensor.gh_vpd
+        name: VPD (kPa)
+        min: 0
+        max: 2
+        needle: true
+        severity:
+          green: 0.8
+          yellow: 1.2
+          red: 1.6
+      - type: entities
+        title: 📊 Plant health
+        entities:
+          - entity: sensor.gh_dew_point
+            name: Dew point
+          - entity: sensor.gh_dewpoint_gap
+            name: Temp − dew point gap
+          - entity: sensor.gh_day_night_differential
+            name: Day/night differential
+          - entity: sensor.gh_pollination_window_pct_24h
+            name: In pollination window (24h)
