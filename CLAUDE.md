@@ -29,6 +29,7 @@ This is a commercial greenhouse control system built around Home Assistant with 
 3. **Fertigation Controller** (ESP32-S3): Manages water/fertilizer mixing with venturi system, ratio monitoring, and flow rate calculation
 4. **Valve Controller** (ESP32-S3): Controls 5 irrigation zone solenoid valves via TB6612FNG drivers with 4 ultrasonic tank level sensors
 5. **Fan Controller** (XIAO ESP32-C3): PWM-controlled exhaust fan with emergency temperature override at 35°C
+6. **Tensiometer Node** (ESP32-S3): Reads 2× MMM tech TX-E electronic tensiometers (0.5–4.5 V ratiometric, **inverted**: 4.5 V=0 kPa / 0.5 V=100 kPa) via 10 kΩ/10 kΩ dividers on GPIO1/GPIO2, publishing soil-water tension (kPa) + zone average over the native HA API. External regulated 5 V supply (common ground with the ESP mandatory). Phase 1 = baseline logging for the parked tensiometer-driven deficit-irrigation design.
 
 ### Data Flow
 1. ESP32 devices collect sensor data
@@ -200,6 +201,7 @@ greenhouse/
   - 192.168.10.153: soil-monitor-2 / soil-2-battery
   - 192.168.10.154: soil-monitor-battery-3
   - 192.168.10.155: climate-sensor-battery-3
+  - 192.168.10.161: greenhouse-tensiometer (ESP32-S3, 2× TX-E, Hi-Wifi)
   - 192.168.10.200: fertigation-control-system
 - Gateway/DNS: 192.168.10.1, Subnet: 255.255.255.0
 - MQTT broker accessible on local network
