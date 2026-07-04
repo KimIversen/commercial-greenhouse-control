@@ -34,8 +34,8 @@ ota:
     password: !secret ota_password
 
 wifi:
-  ssid: !secret wifi_ssid
-  password: !secret wifi_password
+  ssid: !secret hiwifi_ssid
+  password: !secret hiwifi_password
   fast_connect: true
   power_save_mode: none          # steadier ADC on the S3
   manual_ip:
