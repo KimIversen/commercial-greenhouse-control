@@ -192,3 +192,36 @@ views:
             name: Day/night differential
           - entity: sensor.gh_pollination_window_pct_24h
             name: In pollination window (24h)
+      - type: gauge
+        entity: sensor.greenhouse_tensiometer_average_kpa
+        name: Soil tension (avg)
+        min: 0
+        max: 50
+        needle: true
+        # PROVISIONAL bands — higher kPa = drier. Real setpoints come in Phase 2
+        # from the crop-water-potential reference + the baseline.
+        severity:
+          green: 0
+          yellow: 10
+          red: 25
+      - type: history-graph
+        title: 🌱 Soil tension — dryback
+        hours_to_show: 24
+        entities:
+          - entity: sensor.greenhouse_tensiometer_1_kpa
+            name: Sensor 1
+          - entity: sensor.greenhouse_tensiometer_2_kpa
+            name: Sensor 2
+          - entity: sensor.greenhouse_tensiometer_average_kpa
+            name: Average
+      - type: entities
+        title: 🌱 Tensiometers
+        entities:
+          - entity: sensor.greenhouse_tensiometer_1_kpa
+            name: Sensor 1 tension
+          - entity: sensor.greenhouse_tensiometer_2_kpa
+            name: Sensor 2 tension
+          - entity: binary_sensor.greenhouse_tensiometer_1_check_prime
+            name: Sensor 1 — refill/re-prime?
+          - entity: binary_sensor.greenhouse_tensiometer_2_check_prime
+            name: Sensor 2 — refill/re-prime?
