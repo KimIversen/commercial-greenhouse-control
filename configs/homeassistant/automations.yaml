@@ -242,10 +242,12 @@
         message: "Down to {{ states('sensor.greenhouse_climate_2_temperature') }}°C — close up to hold night target (17–18.5°C)."
     - delay: "01:00:00"
 
-# ==================== TASK 9: BASE WATERING PULSES ====================
+# ==================== TASK 9: BASE WATERING PULSES (leaner, cut 2026-07-05) ====================
+# 3 morning-weighted pulses, ~25 min/day (was ~70). Nothing after 12:00 -> long
+# afternoon/overnight dry-back. Tune durations by watching the tensiometer dry-back.
 
 - id: gh_water_0700
-  alias: "GH Water 07:00 (20m)"
+  alias: "GH Water 07:00 (10m)"
   mode: single
   trigger:
     - platform: time
@@ -260,56 +262,16 @@
   action:
     - service: switch.turn_on
       target: {entity_id: switch.plugg_1_vanning}
-    - delay: "00:20:00"
-    - service: switch.turn_off
-      target: {entity_id: switch.plugg_1_vanning}
-
-- id: gh_water_0900
-  alias: "GH Water 09:00 (15m)"
-  mode: single
-  trigger:
-    - platform: time
-      at: "09:00:00"
-  condition:
-    - condition: state
-      entity_id: input_boolean.gh_automation_enabled
-      state: "on"
-    - condition: state
-      entity_id: input_boolean.gh_watering_ha_enabled
-      state: "on"
-  action:
-    - service: switch.turn_on
-      target: {entity_id: switch.plugg_1_vanning}
-    - delay: "00:15:00"
-    - service: switch.turn_off
-      target: {entity_id: switch.plugg_1_vanning}
-
-- id: gh_water_1100
-  alias: "GH Water 11:00 (10m)"
-  mode: single
-  trigger:
-    - platform: time
-      at: "11:00:00"
-  condition:
-    - condition: state
-      entity_id: input_boolean.gh_automation_enabled
-      state: "on"
-    - condition: state
-      entity_id: input_boolean.gh_watering_ha_enabled
-      state: "on"
-  action:
-    - service: switch.turn_on
-      target: {entity_id: switch.plugg_1_vanning}
     - delay: "00:10:00"
     - service: switch.turn_off
       target: {entity_id: switch.plugg_1_vanning}
 
-- id: gh_water_1300
-  alias: "GH Water 13:00 (10m)"
+- id: gh_water_1000
+  alias: "GH Water 10:00 (8m)"
   mode: single
   trigger:
     - platform: time
-      at: "13:00:00"
+      at: "10:00:00"
   condition:
     - condition: state
       entity_id: input_boolean.gh_automation_enabled
@@ -317,56 +279,30 @@
     - condition: state
       entity_id: input_boolean.gh_watering_ha_enabled
       state: "on"
-  action:
-    - service: switch.turn_on
-      target: {entity_id: switch.plugg_1_vanning}
-    - delay: "00:10:00"
-    - service: switch.turn_off
-      target: {entity_id: switch.plugg_1_vanning}
-
-- id: gh_water_1500
-  alias: "GH Water 15:00 (15m)"
-  mode: single
-  trigger:
-    - platform: time
-      at: "15:00:00"
-  condition:
-    - condition: state
-      entity_id: input_boolean.gh_automation_enabled
-      state: "on"
-    - condition: state
-      entity_id: input_boolean.gh_watering_ha_enabled
-      state: "on"
-  action:
-    - service: switch.turn_on
-      target: {entity_id: switch.plugg_1_vanning}
-    - delay: "00:15:00"
-    - service: switch.turn_off
-      target: {entity_id: switch.plugg_1_vanning}
-
-# ==================== TASK 10: EVENING NUDGE ====================
-
-- id: gh_water_evening_nudge
-  alias: "GH Water evening nudge (hot days)"
-  mode: single
-  trigger:
-    - platform: template
-      value_template: >-
-        {{ now() >= (as_datetime(state_attr('sun.sun','next_setting')) - timedelta(hours=2, minutes=30)) and now() < (as_datetime(state_attr('sun.sun','next_setting')) - timedelta(hours=2, minutes=20)) }}
-  condition:
-    - condition: state
-      entity_id: input_boolean.gh_automation_enabled
-      state: "on"
-    - condition: state
-      entity_id: input_boolean.gh_watering_ha_enabled
-      state: "on"
-    - condition: numeric_state
-      entity_id: sensor.greenhouse_climate_2_temperature
-      above: 26
   action:
     - service: switch.turn_on
       target: {entity_id: switch.plugg_1_vanning}
     - delay: "00:08:00"
+    - service: switch.turn_off
+      target: {entity_id: switch.plugg_1_vanning}
+
+- id: gh_water_1200
+  alias: "GH Water 12:00 (7m)"
+  mode: single
+  trigger:
+    - platform: time
+      at: "12:00:00"
+  condition:
+    - condition: state
+      entity_id: input_boolean.gh_automation_enabled
+      state: "on"
+    - condition: state
+      entity_id: input_boolean.gh_watering_ha_enabled
+      state: "on"
+  action:
+    - service: switch.turn_on
+      target: {entity_id: switch.plugg_1_vanning}
+    - delay: "00:07:00"
     - service: switch.turn_off
       target: {entity_id: switch.plugg_1_vanning}
 
