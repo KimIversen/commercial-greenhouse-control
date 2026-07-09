@@ -168,7 +168,7 @@ sensor:
   - platform: history_stats
     name: "GH Water Ontime 24h"
     unique_id: gh_water_ontime_24h
-    entity_id: switch.plugg_1_vanning
+    entity_id: switch.greenhouse_6_vanning
     state: "on"
     type: time
     end: "{{ now() }}"
@@ -176,7 +176,7 @@ sensor:
   - platform: history_stats
     name: "GH Water Ontime 7d"
     unique_id: gh_water_ontime_7d
-    entity_id: switch.plugg_1_vanning
+    entity_id: switch.greenhouse_6_vanning
     state: "on"
     type: time
     end: "{{ now() }}"

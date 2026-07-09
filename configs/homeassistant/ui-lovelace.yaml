@@ -37,8 +37,8 @@ views:
         title: Controls
         show_header_toggle: false
         entities:
-          - entity: switch.plugg_1_vanning
-            name: "Vanning (#1)"
+          - entity: switch.greenhouse_6_vanning
+            name: "Vanning (#6)"
             icon: mdi:water
           - entity: switch.plugg_3_vifte_endevegg_ost
             name: "Vifte endevegg øst (#3)"
@@ -80,12 +80,12 @@ views:
       - type: entities
         title: Plug Health
         entities:
-          - entity: binary_sensor.1_cloud_connection
-            name: "Vanning – Cloud"
-          - entity: sensor.1_signal_level
-            name: "Vanning – Signal"
-          - entity: binary_sensor.1_overheated
-            name: "Vanning – Overheated"
+          - entity: binary_sensor.greenhouse_6_vanning_cloud_connection
+            name: "Vanning (#6) – Cloud"
+          - entity: sensor.greenhouse_6_vanning_signal_level
+            name: "Vanning (#6) – Signal"
+          - entity: binary_sensor.greenhouse_6_vanning_overheated
+            name: "Vanning (#6) – Overheated"
           - type: divider
           - entity: binary_sensor.greenhouse_3_vifte_endevegg_cloud_connection
             name: "Vifte øst – Cloud"
@@ -125,7 +125,7 @@ views:
             name: Fan øst
           - entity: switch.plugg_5_vifte_endevegg_vest
             name: Fan vest
-          - entity: switch.plugg_1_vanning
+          - entity: switch.greenhouse_6_vanning
             name: Vanning
       - type: entities
         title: Thresholds (tune here)

@@ -261,10 +261,10 @@
       state: "on"
   action:
     - service: switch.turn_on
-      target: {entity_id: switch.plugg_1_vanning}
+      target: {entity_id: switch.greenhouse_6_vanning}
     - delay: "00:10:00"
     - service: switch.turn_off
-      target: {entity_id: switch.plugg_1_vanning}
+      target: {entity_id: switch.greenhouse_6_vanning}
 
 - id: gh_water_1000
   alias: "GH Water 10:00 (8m)"
@@ -281,10 +281,10 @@
       state: "on"
   action:
     - service: switch.turn_on
-      target: {entity_id: switch.plugg_1_vanning}
+      target: {entity_id: switch.greenhouse_6_vanning}
     - delay: "00:08:00"
     - service: switch.turn_off
-      target: {entity_id: switch.plugg_1_vanning}
+      target: {entity_id: switch.greenhouse_6_vanning}
 
 - id: gh_water_1200
   alias: "GH Water 12:00 (7m)"
@@ -301,17 +301,17 @@
       state: "on"
   action:
     - service: switch.turn_on
-      target: {entity_id: switch.plugg_1_vanning}
+      target: {entity_id: switch.greenhouse_6_vanning}
     - delay: "00:07:00"
     - service: switch.turn_off
-      target: {entity_id: switch.plugg_1_vanning}
+      target: {entity_id: switch.greenhouse_6_vanning}
 
 - id: gh_water_watchdog
   alias: "GH Watering watchdog (force-off stuck pump)"
   mode: single
   trigger:
     - platform: state
-      entity_id: switch.plugg_1_vanning
+      entity_id: switch.greenhouse_6_vanning
       to: "on"
       for: "00:22:00"
   condition:
@@ -320,7 +320,7 @@
       state: "on"
   action:
     - service: switch.turn_off
-      target: {entity_id: switch.plugg_1_vanning}
+      target: {entity_id: switch.greenhouse_6_vanning}
     - service: script.gh_notify
       data:
         title: "💧 Watering watchdog"
@@ -331,11 +331,11 @@
   mode: queued
   trigger:
     - platform: state
-      entity_id: switch.plugg_1_vanning
+      entity_id: switch.greenhouse_6_vanning
       to: "on"
       id: started
     - platform: state
-      entity_id: switch.plugg_1_vanning
+      entity_id: switch.greenhouse_6_vanning
       to: "off"
       id: stopped
   action:
