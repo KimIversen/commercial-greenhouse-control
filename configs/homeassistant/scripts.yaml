@@ -11,3 +11,8 @@ gh_notify:
       data:
         title: "{{ title }}"
         message: "{{ message }}"
+    - service: notify.mobile_app_kim_aleksander_hammer_sin_iphone
+      continue_on_error: true
+      data:
+        title: "{{ title }}"
+        message: "{{ message }}"
