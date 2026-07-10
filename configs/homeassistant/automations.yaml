@@ -355,3 +355,23 @@
               data:
                 value: >-
                   {{ ((now().timestamp() - as_timestamp(states('input_datetime.gh_watering_started'))) / 60) | round(0) }}
+            - service: input_datetime.set_datetime
+              target: {entity_id: input_datetime.gh_last_pulse_end}
+              data: {datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"}
+            - service: input_number.set_value
+              target: {entity_id: input_number.gh_water_today_minutes}
+              data:
+                value: >-
+                  {{ (states('input_number.gh_water_today_minutes') | float(0))
+                     + ((now().timestamp() - as_timestamp(states('input_datetime.gh_watering_started'))) / 60) | round(1) }}
+
+- id: gh_water_daily_reset
+  alias: "GH Water - reset daily counter"
+  mode: single
+  trigger:
+    - platform: time
+      at: "00:00:00"
+  action:
+    - service: input_number.set_value
+      target: {entity_id: input_number.gh_water_today_minutes}
+      data: {value: 0}
