@@ -138,6 +138,30 @@ views:
           - input_number.gh_overheat_critical
           - input_number.gh_cold_temp
 
+      - type: entities
+        title: "Watering – tensiometer loop"
+        entities:
+          - entity: input_boolean.gh_watering_closedloop_enabled
+            name: "Closed-loop enabled"
+          - entity: sensor.greenhouse_tensiometer_average_kpa
+            name: "Tension avg"
+          - entity: sensor.greenhouse_tensiometer_1_kpa
+            name: "Tension ch1 (drier)"
+          - type: divider
+          - input_number.gh_tension_on
+          - input_number.gh_tension_ch1_cap
+          - input_number.gh_tension_off
+          - input_number.gh_pulse_minutes
+          - input_number.gh_pulse_wait_minutes
+          - input_number.gh_water_daily_cap_minutes
+          - type: divider
+          - entity: input_number.gh_water_today_minutes
+            name: "Water minutes today"
+          - entity: input_datetime.gh_last_pulse_end
+            name: "Last pulse ended"
+          - entity: switch.greenhouse_6_vanning
+            name: "Pump (Vanning #6)"
+
   # ==================== METRICS ====================
   - title: Metrics
     path: metrics
