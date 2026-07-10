@@ -5,6 +5,7 @@ substitutions:
   s1_pin: "GPIO1"        # ADC1_CH0, non-strapping
   s2_pin: "GPIO2"        # ADC1_CH1, non-strapping
   update_interval: "30s"
+  fault_pin_v_min: "0.15"   # pin V below this = TX-E unpowered/disconnected -> report fault (NaN), not a bogus 100 kPa
 
 esphome:
   name: ${device_name}
@@ -108,7 +109,13 @@ sensor:
     accuracy_decimals: 1
     icon: mdi:gauge-low
     update_interval: ${update_interval}
-    lambda: 'return id(t1_pin_v).state;'
+    lambda: |-
+      float v = id(t1_pin_v).state;
+      // Fault guard: an unpowered/disconnected TX-E reads ~0 V, which the inverted
+      // calibration would map to a bogus "100 kPa" (bone dry). Guard below the
+      // 0.25 V (=100 kPa) point -> publish NaN (unavailable), not a fake dry reading.
+      if (!isnan(v) && v < ${fault_pin_v_min}f) return NAN;
+      return v;
     filters:
       - calibrate_linear:
           - 2.25 -> 0.0        # 4.5 V sensor  = wet
@@ -126,7 +133,11 @@ sensor:
     accuracy_decimals: 1
     icon: mdi:gauge-low
     update_interval: ${update_interval}
-    lambda: 'return id(t2_pin_v).state;'
+    lambda: |-
+      float v = id(t2_pin_v).state;
+      // Fault guard: see channel 1 — <0.15 V pin means unpowered/disconnected, not 100 kPa.
+      if (!isnan(v) && v < ${fault_pin_v_min}f) return NAN;
+      return v;
     filters:
       - calibrate_linear:
           - 2.25 -> 0.0
