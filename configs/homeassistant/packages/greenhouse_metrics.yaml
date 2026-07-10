@@ -1,6 +1,9 @@
 input_datetime:
   gh_watering_started: {name: "Watering started", has_date: true, has_time: true}
   gh_last_watering: {name: "Last watering", has_date: true, has_time: true}
+  gh_last_pulse_end: {name: "Last pulse ended", has_date: true, has_time: true}
+  gh_water_window_start: {name: "Water window start", has_time: true, initial: "06:00:00"}
+  gh_water_window_end: {name: "Water window end", has_time: true, initial: "18:00:00"}
 
 input_number:
   gh_last_watering_minutes:
