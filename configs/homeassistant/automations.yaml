@@ -259,6 +259,10 @@
     - condition: state
       entity_id: input_boolean.gh_watering_ha_enabled
       state: "on"
+    - condition: template
+      value_template: >-
+        {{ is_state('input_boolean.gh_watering_closedloop_enabled','off')
+           or states('sensor.greenhouse_tensiometer_average_kpa') in ['unavailable','unknown'] }}
   action:
     - service: switch.turn_on
       target: {entity_id: switch.greenhouse_6_vanning}
@@ -279,6 +283,10 @@
     - condition: state
       entity_id: input_boolean.gh_watering_ha_enabled
       state: "on"
+    - condition: template
+      value_template: >-
+        {{ is_state('input_boolean.gh_watering_closedloop_enabled','off')
+           or states('sensor.greenhouse_tensiometer_average_kpa') in ['unavailable','unknown'] }}
   action:
     - service: switch.turn_on
       target: {entity_id: switch.greenhouse_6_vanning}
@@ -299,6 +307,10 @@
     - condition: state
       entity_id: input_boolean.gh_watering_ha_enabled
       state: "on"
+    - condition: template
+      value_template: >-
+        {{ is_state('input_boolean.gh_watering_closedloop_enabled','off')
+           or states('sensor.greenhouse_tensiometer_average_kpa') in ['unavailable','unknown'] }}
   action:
     - service: switch.turn_on
       target: {entity_id: switch.greenhouse_6_vanning}
@@ -313,7 +325,7 @@
     - platform: state
       entity_id: switch.greenhouse_6_vanning
       to: "on"
-      for: "00:22:00"
+      for: "00:16:00"
   condition:
     - condition: state
       entity_id: input_boolean.gh_watering_ha_enabled
