@@ -375,3 +375,60 @@
     - service: input_number.set_value
       target: {entity_id: input_number.gh_water_today_minutes}
       data: {value: 0}
+
+- id: gh_water_tension_loop
+  alias: "GH Water - tensiometer closed loop"
+  mode: single
+  max_exceeded: silent
+  trigger:
+    - platform: time_pattern
+      minutes: "/5"
+    - platform: numeric_state
+      entity_id: sensor.greenhouse_tensiometer_average_kpa
+      above: input_number.gh_tension_on
+  condition:
+    # --- master gates ---
+    - condition: state
+      entity_id: input_boolean.gh_automation_enabled
+      state: "on"
+    - condition: state
+      entity_id: input_boolean.gh_watering_ha_enabled
+      state: "on"
+    - condition: state
+      entity_id: input_boolean.gh_watering_closedloop_enabled
+      state: "on"
+    # --- sensor valid (covers device-offline AND fault-guard NaN) ---
+    - condition: template
+      value_template: "{{ states('sensor.greenhouse_tensiometer_average_kpa') not in ['unavailable','unknown'] }}"
+    # --- inside the daytime window ---
+    - condition: template
+      value_template: >-
+        {{ today_at(states('input_datetime.gh_water_window_start')) <= now()
+           <= today_at(states('input_datetime.gh_water_window_end')) }}
+    # --- min interval since last pulse ended (covers tensiometer lag) ---
+    - condition: template
+      value_template: >-
+        {{ (now().timestamp() - (state_attr('input_datetime.gh_last_pulse_end','timestamp') | float(0)))
+           > (states('input_number.gh_pulse_wait_minutes') | float(30)) * 60 }}
+    # --- tension trip: avg over on-setpoint OR drier probe over cap; and not already wet ---
+    - condition: template
+      value_template: >-
+        {% set avg = states('sensor.greenhouse_tensiometer_average_kpa') | float(0) %}
+        {% set ch1 = states('sensor.greenhouse_tensiometer_1_kpa') | float(0) %}
+        {% set on = states('input_number.gh_tension_on') | float(30) %}
+        {% set off = states('input_number.gh_tension_off') | float(12) %}
+        {% set cap = states('input_number.gh_tension_ch1_cap') | float(40) %}
+        {{ (avg >= on or ch1 >= cap) and avg > off }}
+    # --- under the daily runtime cap ---
+    - condition: template
+      value_template: >-
+        {{ (states('input_number.gh_water_today_minutes') | float(0))
+           + (states('input_number.gh_pulse_minutes') | float(13))
+           <= (states('input_number.gh_water_daily_cap_minutes') | float(90)) }}
+  action:
+    - service: switch.turn_on
+      target: {entity_id: switch.greenhouse_6_vanning}
+    - delay:
+        minutes: "{{ states('input_number.gh_pulse_minutes') | int(13) }}"
+    - service: switch.turn_off
+      target: {entity_id: switch.greenhouse_6_vanning}
