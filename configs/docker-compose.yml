@@ -44,7 +44,7 @@ services:
       - ./config/homeassistant:/config
       - ./logs:/config/logs
       - /etc/localtime:/etc/localtime:ro
-    # Host networking so HA can do LAN device discovery (TP-Link/Tapo, zeroconf, etc.).
+    # Host networking so HA can do LAN device discovery (Shelly, ESPHome, zeroconf, etc.).
     # extra_hosts keeps the DB/MQTT container-name lookups working by pointing them at the
     # published host ports (mariadb -> 127.0.0.1:3306, mosquitto -> 127.0.0.1:1883).
     network_mode: host
