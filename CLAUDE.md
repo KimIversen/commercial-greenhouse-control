@@ -31,6 +31,21 @@ This is a commercial greenhouse control system built around Home Assistant with 
 5. **Fan Controller** (XIAO ESP32-C3): PWM-controlled exhaust fan with emergency temperature override at 35°C
 6. **Tensiometer Nodes**: Each reads 2× MMM tech TX-E electronic tensiometers (0.5–4.5 V ratiometric, **inverted**: 4.5 V=0 kPa / 0.5 V=100 kPa) via a Gravity **ADS1115** 16-bit ADC (addr 0x48) reading A0/A1 directly at gain ±6.144 V — no voltage dividers. Two nodes, differing only in board and I2C pins: **tensiometer-1** (ESP32-S3, I2C on GPIO8/GPIO9) and **tensiometer-2** (XIAO ESP32-C3, I2C on GPIO6/GPIO7 = D4/D5; 3.3 V logic, so pull SDA/SCL to 3.3 V not 5 V). Publishes soil-water tension (kPa) + zone average over the native HA API. External regulated 5 V supply feeds both the sensors and the ADS1115 VDD (common ground with the ESP mandatory; 5 V VDD required so the 4.5 V input stays in range). Phase 1 = baseline logging for the parked tensiometer-driven deficit-irrigation design.
 
+### Mains Switching (Shelly)
+Three **Shelly 1PM Gen3** relays replaced the original TP-Link/Tapo plugs (2026-07-19).
+Each provides local-API switching plus true power metering (W, A, V, Wh, device temperature).
+Entities: `switch.greenhouse_shelly_watering`, `switch.greenhouse_shelly_fan_east`,
+`switch.greenhouse_shelly_fan_west`.
+
+**Entity-ID caveat:** `switch.greenhouse_shelly_fan_east` originally belonged to the *west*
+unit — HA does not regenerate entity IDs when a device is renamed. This was corrected in the
+entity registry on 2026-07-19. If a plug is ever replaced again, grep for the switch entity ID
+**and** the device-name slug, and confirm the physical mapping by power draw before trusting a
+slug.
+
+Power metering enables `gh_water_no_flow_alert`, which detects a pump that is commanded on but
+drawing no current — a failure previously invisible to HA.
+
 ### Data Flow
 1. ESP32 devices collect sensor data
 2. Data published via MQTT to Home Assistant
@@ -203,6 +218,9 @@ greenhouse/
   - 192.168.10.155: climate-sensor-battery-3
   - 192.168.10.161: greenhouse-tensiometer (ESP32-S3, 2× TX-E, Hi-Wifi)
   - 192.168.10.162: greenhouse-tensiometer-2 (XIAO ESP32-C3, 2× TX-E, Hi-Wifi)
+  - 192.168.10.164: Shelly - Fan West (Shelly 1PM Gen3, endwall fan west)
+  - 192.168.10.187: Shelly - Fan East (Shelly 1PM Gen3, endwall fan east)
+  - 192.168.10.194: Shelly - Watering (Shelly 1PM Gen3, irrigation pump)
   - 192.168.10.200: fertigation-control-system
 - Gateway/DNS: 192.168.10.1, Subnet: 255.255.255.0
 - MQTT broker accessible on local network
