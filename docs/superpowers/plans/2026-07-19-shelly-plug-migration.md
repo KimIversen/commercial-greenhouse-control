@@ -447,11 +447,18 @@ drawing no current — a failure previously invisible to HA.
 
 - [ ] **Step 3: Verify no stale Tapo plug references remain in the doc**
 
+The goal is that no reference survives implying the Tapo plugs are still *operational*. The
+historical sentence added in Step 2 deliberately names them, so exclude that line:
+
 ```bash
-grep -n -i "tapo\|plugg_" CLAUDE.md ; echo "exit=$?"
+grep -n -i "tapo\|plugg_" CLAUDE.md | grep -v "replaced the original" ; echo "exit=$?"
 ```
 
 Expected: no output, `exit=1`.
+
+(An earlier draft of this plan gated on a bare `grep -i "tapo"`, which Step 2's own mandated text
+cannot satisfy. Keeping the hardware lineage in the docs was judged more valuable than a clean
+grep — the previous plug swap's hard-won lesson was precisely about knowing the *old* names.)
 
 - [ ] **Step 4: Commit**
 
