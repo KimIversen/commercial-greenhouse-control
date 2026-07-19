@@ -185,6 +185,7 @@ views:
           - input_number.gh_pulse_minutes
           - input_number.gh_pulse_wait_minutes
           - input_number.gh_water_daily_cap_minutes
+          - input_number.gh_pump_min_watts
           - type: divider
           - entity: input_number.gh_water_today_minutes
             name: "Water minutes today"

@@ -336,7 +336,7 @@
     - service: script.gh_notify
       data:
         title: "💧 Watering watchdog"
-        message: "Vanning pump was on >22 min — forced off (possible stuck pulse after a restart)."
+        message: "Vanning pump was on >16 min — forced off (possible stuck pulse after a restart)."
 
 - id: gh_watering_tracker
   alias: "GH Watering tracker (record last/duration)"
@@ -444,3 +444,36 @@
         minutes: "{{ states('input_number.gh_pulse_minutes') | int(13) }}"
     - service: switch.turn_off
       target: {entity_id: switch.greenhouse_shelly_watering}
+
+- id: gh_water_no_flow_alert
+  alias: "GH Watering no-flow alert (pump drawing no power)"
+  mode: single
+  trigger:
+    - platform: state
+      entity_id: switch.greenhouse_shelly_watering
+      to: "on"
+      for: "00:02:00"
+  condition:
+    # still on — guards against a pulse that ended during the settle window
+    - condition: state
+      entity_id: switch.greenhouse_shelly_watering
+      state: "on"
+    # power sensor must be reporting a real number; if it is unavailable we
+    # cannot conclude anything, so stay silent rather than cry wolf
+    - condition: template
+      value_template: >-
+        {{ states('sensor.greenhouse_shelly_watering_effekt')
+           not in ['unavailable','unknown','none',''] }}
+    - condition: template
+      value_template: >-
+        {{ (states('sensor.greenhouse_shelly_watering_effekt') | float(9999))
+           < (states('input_number.gh_pump_min_watts') | float(30)) }}
+  action:
+    - service: script.gh_notify
+      data:
+        title: "🚱 Vanning: ingen strømtrekk"
+        message: >-
+          Pumpen er kommandert PÅ men trekker bare
+          {{ states('sensor.greenhouse_shelly_watering_effekt') }} W
+          (grense {{ states('input_number.gh_pump_min_watts') }} W).
+          Sjekk pumpe, sikring og kobling — vanning kan ha stoppet.

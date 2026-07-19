@@ -115,3 +115,12 @@ gh_water_today_minutes:
   step: 1
   unit_of_measurement: "min"
   icon: mdi:water-check
+
+gh_pump_min_watts:
+  name: "Pump min watts (flow check)"
+  min: 0
+  max: 300
+  step: 5
+  initial: 30
+  unit_of_measurement: "W"
+  icon: mdi:flash-alert
