@@ -32,19 +32,34 @@ views:
               yellow: 70
               red: 85
 
-      # --- Controls (Tapo plugs) ---
+      # --- Controls (Shelly 1PM plugs) ---
       - type: entities
         title: Controls
         show_header_toggle: false
         entities:
           - entity: switch.greenhouse_shelly_watering
-            name: "Vanning (#6)"
+            name: "Vanning"
             icon: mdi:water
           - entity: switch.greenhouse_shelly_fan_east
-            name: "Vifte endevegg øst (#3)"
+            name: "Vifte endevegg øst"
             icon: mdi:fan
           - entity: switch.greenhouse_shelly_fan_west
-            name: "Vifte endevegg vest (#5)"
+            name: "Vifte endevegg vest"
+            icon: mdi:fan
+
+      # --- Live power draw (Shelly 1PM) ---
+      - type: entities
+        title: Plug Power
+        show_header_toggle: false
+        entities:
+          - entity: sensor.greenhouse_shelly_watering_effekt
+            name: "Vanning – pumpe"
+            icon: mdi:water-pump
+          - entity: sensor.greenhouse_shelly_fan_east_effekt
+            name: "Vifte øst"
+            icon: mdi:fan
+          - entity: sensor.greenhouse_shelly_fan_west_effekt
+            name: "Vifte vest"
             icon: mdi:fan
 
       # --- 24h history ---
@@ -80,26 +95,42 @@ views:
       - type: entities
         title: Plug Health
         entities:
-          - entity: binary_sensor.greenhouse_6_vanning_cloud_connection
-            name: "Vanning (#6) – Cloud"
-          - entity: sensor.greenhouse_6_vanning_signal_level
-            name: "Vanning (#6) – Signal"
-          - entity: binary_sensor.greenhouse_6_vanning_overheated
-            name: "Vanning (#6) – Overheated"
-          - type: divider
-          - entity: binary_sensor.greenhouse_3_vifte_endevegg_cloud_connection
-            name: "Vifte øst – Cloud"
-          - entity: sensor.greenhouse_3_vifte_endevegg_signal_level
-            name: "Vifte øst – Signal"
-          - entity: binary_sensor.greenhouse_3_vifte_endevegg_overheated
-            name: "Vifte øst – Overheated"
-          - type: divider
-          - entity: binary_sensor.greenhouse_5_vifte_endevegg_cloud_connection
-            name: "Vifte vest – Cloud"
-          - entity: sensor.greenhouse_5_vifte_endevegg_signal_level
-            name: "Vifte vest – Signal"
-          - entity: binary_sensor.greenhouse_5_vifte_endevegg_overheated
-            name: "Vifte vest – Overheated"
+          - type: section
+            label: "Vanning"
+          - entity: sensor.greenhouse_shelly_watering_signalstyrke
+            name: "Signal"
+          - entity: sensor.greenhouse_shelly_watering_temperatur
+            name: "Temperatur"
+          - entity: sensor.greenhouse_shelly_watering_spenning
+            name: "Nettspenning"
+          - entity: binary_sensor.greenhouse_shelly_watering_overheating
+            name: "Overoppheting"
+          - entity: binary_sensor.greenhouse_shelly_watering_overpowering
+            name: "Overbelastning"
+          - type: section
+            label: "Vifte øst"
+          - entity: sensor.greenhouse_shelly_fan_east_signalstyrke
+            name: "Signal"
+          - entity: sensor.greenhouse_shelly_fan_east_temperatur
+            name: "Temperatur"
+          - entity: sensor.greenhouse_shelly_fan_east_spenning
+            name: "Nettspenning"
+          - entity: binary_sensor.greenhouse_shelly_fan_east_overheating
+            name: "Overoppheting"
+          - entity: binary_sensor.greenhouse_shelly_fan_east_overpowering
+            name: "Overbelastning"
+          - type: section
+            label: "Vifte vest"
+          - entity: sensor.greenhouse_shelly_fan_west_signalstyrke
+            name: "Signal"
+          - entity: sensor.greenhouse_shelly_fan_west_temperatur
+            name: "Temperatur"
+          - entity: sensor.greenhouse_shelly_fan_west_spenning
+            name: "Nettspenning"
+          - entity: binary_sensor.greenhouse_shelly_fan_west_overheating
+            name: "Overoppheting"
+          - entity: binary_sensor.greenhouse_shelly_fan_west_overpowering
+            name: "Overbelastning"
 
       - type: entities
         title: Maintenance
@@ -160,7 +191,7 @@ views:
           - entity: input_datetime.gh_last_pulse_end
             name: "Last pulse ended"
           - entity: switch.greenhouse_shelly_watering
-            name: "Pump (Vanning #6)"
+            name: "Pumpe (Vanning)"
 
   # ==================== METRICS ====================
   - title: Metrics
