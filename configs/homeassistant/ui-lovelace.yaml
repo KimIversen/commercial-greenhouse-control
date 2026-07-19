@@ -218,7 +218,7 @@ views:
             name: In pollination window (24h)
       - type: gauge
         entity: sensor.greenhouse_tensiometer_average_kpa
-        name: Soil tension (avg)
+        name: Soil tension — node 1 (avg)
         min: 0
         max: 50
         needle: true
@@ -229,7 +229,7 @@ views:
           yellow: 10
           red: 25
       - type: history-graph
-        title: 🌱 Soil tension — dryback
+        title: 🌱 Soil tension — dryback (node 1)
         hours_to_show: 24
         entities:
           - entity: sensor.greenhouse_tensiometer_1_kpa
@@ -239,7 +239,7 @@ views:
           - entity: sensor.greenhouse_tensiometer_average_kpa
             name: Average
       - type: entities
-        title: 🌱 Tensiometers
+        title: 🌱 Tensiometers (node 1)
         entities:
           - entity: sensor.greenhouse_tensiometer_1_kpa
             name: Sensor 1 tension
@@ -249,3 +249,47 @@ views:
             name: Sensor 1 — refill/re-prime?
           - entity: binary_sensor.greenhouse_tensiometer_2_check_prime
             name: Sensor 2 — refill/re-prime?
+
+      # ---- Tensiometer node 2 (XIAO ESP32-C3, .162) ----
+      # NOTE: entity ids for node 2 are greenhouse_tensiometer_2_<channel>_*.
+      # Do not confuse sensor.greenhouse_tensiometer_2_kpa (node 1, channel 2)
+      # with sensor.greenhouse_tensiometer_2_2_kpa (node 2, channel 2).
+      # Display only — node 2 is NOT wired into the closed-loop watering
+      # automation, which still reads node 1 exclusively.
+      - type: gauge
+        entity: sensor.greenhouse_tensiometer_2_average_kpa
+        name: Soil tension — node 2 (avg)
+        min: 0
+        max: 50
+        needle: true
+        # Same PROVISIONAL bands as node 1 — see the note above.
+        severity:
+          green: 0
+          yellow: 10
+          red: 25
+      - type: history-graph
+        title: 🌱 Soil tension — dryback (node 2)
+        hours_to_show: 24
+        entities:
+          - entity: sensor.greenhouse_tensiometer_2_1_kpa
+            name: Sensor 1
+          - entity: sensor.greenhouse_tensiometer_2_2_kpa
+            name: Sensor 2
+          - entity: sensor.greenhouse_tensiometer_2_average_kpa
+            name: Average
+      - type: entities
+        title: 🌱 Tensiometers (node 2)
+        entities:
+          - entity: sensor.greenhouse_tensiometer_2_1_kpa
+            name: Sensor 1 tension
+          - entity: sensor.greenhouse_tensiometer_2_2_kpa
+            name: Sensor 2 tension
+          - entity: binary_sensor.greenhouse_tensiometer_2_1_check_prime
+            name: Sensor 1 — refill/re-prime?
+          - entity: binary_sensor.greenhouse_tensiometer_2_2_check_prime
+            name: Sensor 2 — refill/re-prime?
+          - type: divider
+          - entity: binary_sensor.greenhouse_tensiometer_2_status
+            name: Node 2 online
+          - entity: sensor.greenhouse_tensiometer_2_wifi_signal
+            name: Node 2 WiFi
