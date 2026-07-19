@@ -1,0 +1,272 @@
+substitutions:
+  device_name: "greenhouse-tensiometer-2"
+  friendly_name: "Greenhouse Tensiometer 2"
+  device_ip: "192.168.10.162"
+  i2c_sda: "GPIO6"       # XIAO ESP32-C3 D4 -> ADS1115 SDA
+  i2c_scl: "GPIO7"       # XIAO ESP32-C3 D5 -> ADS1115 SCL
+  update_interval: "30s"
+  fault_pin_v_min: "0.30"   # sensor V below this = TX-E unpowered/disconnected -> report fault (NaN), not a bogus 100 kPa (healthy floor is 0.5 V = 100 kPa)
+  # ---- 5 V rail monitor (ADS1115 A2, no divider: gain 6.144 spans 5 V and the
+  # ADS1115 input limit is VDD+0.3, so A2 may sit directly on the 5 V rail) ----
+  # Rail is a bench-adjusted industrial supply set to exactly 5.00 V, so this is
+  # a tight +/-2% window. The window width IS the max undetected phantom tension:
+  # the TX-E is ratiometric, so a rail at R reads (4.5 - 4.5*R/5)*25 kPa at true
+  # zero -> +/-2% = +/-2.25 kPa. Widen only with that trade-off in mind.
+  rail_v_min: "4.90"
+  rail_v_max: "5.10"
+  rail_guard_enabled: "false"   # ships FALSE. Wire A2 -> 5 V rail, confirm the "5V Rail" sensor reads ~5 V, THEN set true and re-flash.
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  comment: "2x MMM tech TX-E tensiometers (kPa) via Gravity ADS1115 (I2C) on A0/A1 - XIAO ESP32-C3"
+
+esp32:
+  board: seeed_xiao_esp32c3
+  framework:
+    type: arduino
+
+logger:
+  level: INFO
+  logs:
+    sensor: WARN
+    api: WARN
+    wifi: INFO
+    ota: INFO
+
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret hiwifi_ssid
+  password: !secret hiwifi_password
+  fast_connect: true
+  power_save_mode: none          # keep API/web responsive
+  manual_ip:
+    static_ip: ${device_ip}
+    gateway: 192.168.10.1
+    subnet: 255.255.255.0
+    dns1: 192.168.10.1
+  ap:
+    ssid: "Tensiometer 2 Fallback"
+    password: !secret fallback_password
+
+web_server:
+  port: 80
+
+time:
+  - platform: sntp
+    id: sntp_time
+    timezone: "Europe/Oslo"
+    servers:
+      - pool.ntp.org
+      - time.google.com
+
+# Gravity ADS1115 16-bit ADC (I2C). External 5 V supply, common ground with the ESP.
+# VDD = 5 V is required so the 4.5 V "wet" endpoint stays within input range.
+# NOTE: the XIAO ESP32-C3 is 3.3 V logic; the ADS1115 I2C lines are 5 V-tolerant-ish
+# via its own pull-ups, so pull SDA/SCL to 3.3 V (not 5 V) on the Gravity module.
+i2c:
+  sda: ${i2c_sda}
+  scl: ${i2c_scl}
+  scan: true
+
+ads1115:
+  - address: 0x48        # ADDR -> GND (Gravity factory default)
+
+sensor:
+  # ---- Raw sensor voltages from ADS1115 A0/A1 (internal, feed the kPa templates) ----
+  # ADS1115 reads the un-divided 0.5-4.5 V TX-E output directly; gain 6.144 (±6.144 V FS)
+  # is the only range that spans the 4.5 V wet endpoint.
+  - platform: ads1115
+    id: t1_pin_v
+    multiplexer: A0_GND
+    gain: 6.144
+    update_interval: ${update_interval}
+    internal: true
+    filters:
+      - sliding_window_moving_average: { window_size: 8, send_every: 1 }
+  - platform: ads1115
+    id: t2_pin_v
+    multiplexer: A1_GND
+    gain: 6.144
+    update_interval: ${update_interval}
+    internal: true
+    filters:
+      - sliding_window_moving_average: { window_size: 8, send_every: 1 }
+  # A2 sits directly on the 5 V excitation rail (no divider — see substitutions).
+  # Reads ~0 V until the jumper is fitted; harmless while rail_guard_enabled is false.
+  - platform: ads1115
+    id: rail_pin_v
+    multiplexer: A2_GND
+    gain: 6.144
+    update_interval: ${update_interval}
+    internal: true
+    filters:
+      - sliding_window_moving_average: { window_size: 8, send_every: 1 }
+
+  # ---- Diagnostic: exposed sensor voltage (true 0.5-4.5 V, for calibration / fault-spotting) ----
+  - platform: template
+    name: "1 Volts"
+    id: t1_volts
+    unit_of_measurement: "V"
+    device_class: voltage
+    state_class: measurement
+    accuracy_decimals: 3
+    entity_category: diagnostic
+    update_interval: ${update_interval}
+    lambda: 'return id(t1_pin_v).state;'
+  - platform: template
+    name: "2 Volts"
+    id: t2_volts
+    unit_of_measurement: "V"
+    device_class: voltage
+    state_class: measurement
+    accuracy_decimals: 3
+    entity_category: diagnostic
+    update_interval: ${update_interval}
+    lambda: 'return id(t2_pin_v).state;'
+  - platform: template
+    name: "5V Rail"
+    id: rail_volts
+    unit_of_measurement: "V"
+    device_class: voltage
+    state_class: measurement
+    accuracy_decimals: 3
+    entity_category: diagnostic
+    update_interval: ${update_interval}
+    lambda: 'return id(rail_pin_v).state;'
+
+  # ---- Tension in kPa (INVERTED calibrate_linear; clamp 0..100) ----
+  - platform: template
+    name: "1 kPa"
+    id: t1_kpa
+    unit_of_measurement: "kPa"
+    state_class: measurement
+    accuracy_decimals: 1
+    icon: mdi:gauge-low
+    update_interval: ${update_interval}
+    lambda: |-
+      float v = id(t1_pin_v).state;
+      float rail = id(rail_pin_v).state;
+      // Rail guard: the TX-E output is RATIOMETRIC to its excitation supply, so a
+      // sagging or back-fed 5 V rail is indistinguishable from drying soil at the
+      // sensor pin — it yields a plausible, stable, WRONG tension that the dry-floor
+      // guard below can never catch (observed 2026-07-19: a 4.07 V rail made unprimed
+      // bench sensors report a rock-steady 13.8 kPa). Only enforced once A2 is wired.
+      if (${rail_guard_enabled} && !isnan(rail) &&
+          (rail < ${rail_v_min}f || rail > ${rail_v_max}f)) return NAN;
+      // Fault guard: an unpowered/disconnected TX-E reads ~0 V, which the inverted
+      // calibration would map to a bogus "100 kPa" (bone dry). Guard below the
+      // 0.5 V (=100 kPa) dry floor -> publish NaN (unavailable), not a fake dry reading.
+      if (!isnan(v) && v < ${fault_pin_v_min}f) return NAN;
+      return v;
+    filters:
+      - calibrate_linear:
+          - 4.5 -> 0.0         # 4.5 V sensor = wet (0 kPa)
+          - 0.5 -> 100.0       # 0.5 V sensor = dry (100 kPa)
+      - lambda: |-
+          if (isnan(x)) return x;
+          if (x < 0.0f) x = 0.0f;
+          if (x > 100.0f) x = 100.0f;
+          return x;
+  - platform: template
+    name: "2 kPa"
+    id: t2_kpa
+    unit_of_measurement: "kPa"
+    state_class: measurement
+    accuracy_decimals: 1
+    icon: mdi:gauge-low
+    update_interval: ${update_interval}
+    lambda: |-
+      float v = id(t2_pin_v).state;
+      float rail = id(rail_pin_v).state;
+      // Rail guard: see channel 1 — a wrong-but-stable excitation rail reads as fake tension.
+      if (${rail_guard_enabled} && !isnan(rail) &&
+          (rail < ${rail_v_min}f || rail > ${rail_v_max}f)) return NAN;
+      // Fault guard: see channel 1 — <0.30 V sensor means unpowered/disconnected, not 100 kPa.
+      if (!isnan(v) && v < ${fault_pin_v_min}f) return NAN;
+      return v;
+    filters:
+      - calibrate_linear:
+          - 4.5 -> 0.0
+          - 0.5 -> 100.0
+      - lambda: |-
+          if (isnan(x)) return x;
+          if (x < 0.0f) x = 0.0f;
+          if (x > 100.0f) x = 100.0f;
+          return x;
+
+  # ---- Zone average (NaN-safe) ----
+  - platform: template
+    name: "Average kPa"
+    id: t_avg_kpa
+    unit_of_measurement: "kPa"
+    state_class: measurement
+    accuracy_decimals: 1
+    icon: mdi:gauge
+    update_interval: ${update_interval}
+    lambda: |-
+      float a = id(t1_kpa).state;
+      float b = id(t2_kpa).state;
+      int n = 0; float sum = 0.0f;
+      if (!isnan(a)) { sum += a; n++; }
+      if (!isnan(b)) { sum += b; n++; }
+      return n > 0 ? sum / n : NAN;
+
+  # ---- Standard diagnostics ----
+  - platform: wifi_signal
+    name: "WiFi Signal"
+    update_interval: 60s
+    entity_category: diagnostic
+  - platform: uptime
+    name: "Uptime"
+    device_class: duration
+    entity_category: diagnostic
+
+binary_sensor:
+  - platform: status
+    name: "Status"
+    device_class: connectivity
+  - platform: template
+    name: "1 Check Prime"
+    id: t1_check_prime
+    icon: mdi:water-alert
+    # >~800 hPa (80 kPa): TX-E starts losing water
+    lambda: |-
+      if (isnan(id(t1_kpa).state)) return {};
+      return id(t1_kpa).state > 80.0;
+  - platform: template
+    name: "2 Check Prime"
+    id: t2_check_prime
+    icon: mdi:water-alert
+    lambda: |-
+      if (isnan(id(t2_kpa).state)) return {};
+      return id(t2_kpa).state > 80.0;
+  # Always reports, even while rail_guard_enabled is false — so the rail can be
+  # verified before the guard is armed, and a rail fault is visible either way.
+  - platform: template
+    name: "Rail Fault"
+    id: rail_fault
+    icon: mdi:flash-alert
+    device_class: problem
+    entity_category: diagnostic
+    lambda: |-
+      float rail = id(rail_pin_v).state;
+      if (isnan(rail)) return {};
+      return (rail < ${rail_v_min}f || rail > ${rail_v_max}f);
+
+button:
+  - platform: restart
+    name: "Restart"
+    entity_category: config
+
+switch:
+  - platform: safe_mode
+    name: "Safe Mode"
+    entity_category: config

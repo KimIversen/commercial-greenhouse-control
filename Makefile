@@ -52,14 +52,17 @@ deploy-ha:
 	@echo "Deploying Home Assistant config..."
 	$(RSYNC) \
 		--exclude='secrets.yaml' \
+		--exclude='secrets.yaml.example' \
 		--exclude='.storage/' \
+		--exclude='.cloud/' \
+		--exclude='.cache/' \
+		--exclude='blueprints/' \
+		--exclude='tts/' \
+		--exclude='custom_components/' \
+		--exclude='automations/' \
 		--exclude='*.log' \
 		--exclude='*.db' \
 		--exclude='home-assistant_v2.db*' \
-		--exclude='tts/' \
-		--exclude='blueprints/' \
-		--exclude='custom_components/' \
-		--exclude='.cloud/' \
 		configs/homeassistant/ $(SERVER):$(SERVER_DIR)/config/homeassistant/
 	@echo "Restarting Home Assistant..."
 	$(SSH) "cd $(SERVER_DIR) && docker compose restart homeassistant"

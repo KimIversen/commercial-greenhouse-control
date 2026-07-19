@@ -1,527 +1,327 @@
-title: Commercial Greenhouse Control
+title: Greenhouse Control
 views:
-  - title: Overview
-    path: overview
+  # ==================== GREENHOUSE ====================
+  - title: Greenhouse
+    path: greenhouse
     icon: mdi:greenhouse
     cards:
-      # System Status Header
+      - type: markdown
+        content: "# 🌱 Greenhouse"
+
+      # --- Climate at a glance ---
       - type: horizontal-stack
         cards:
-          - type: entity
-            entity: binary_sensor.greenhouse_soil_1_status
-            name: Soil 1
-            icon: mdi:flower
-          - type: entity
-            entity: binary_sensor.greenhouse_soil_2_status  
-            name: Soil 2
-            icon: mdi:flower
-          - type: entity
-            entity: sensor.greenhouse_soil_1_battery_level
-            name: Soil 1 Battery
-            icon: mdi:battery
-          - type: entity
-            entity: sensor.greenhouse_soil_2_battery_level
-            name: Soil 2 Battery
-            icon: mdi:battery
-
-      # Environmental Conditions
-      - type: entities
-        title: Current Conditions
-        show_header_toggle: false
-        entities:
-          - entity: sensor.greenhouse_climate_1_temperature
-            name: Temperature Zone 1
-          - entity: sensor.greenhouse_climate_1_humidity
-            name: Humidity Zone 1
-          - entity: sensor.greenhouse_climate_2_temperature
-            name: Temperature Zone 2
-          - entity: sensor.greenhouse_climate_2_humidity
-            name: Humidity Zone 2
-          - type: divider
-          - entity: sensor.greenhouse_soil_1_average_vwc
-            name: Soil Moisture Zone 1
-          - entity: sensor.greenhouse_soil_2_average_vwc
-            name: Soil Moisture Zone 2
-          - entity: sensor.greenhouse_soil_1_battery_level
-            name: Zone 1 Battery Level
-          - entity: sensor.greenhouse_soil_2_battery_level
-            name: Zone 2 Battery Level
-
-      # Quick Actions
-      - type: entities
-        title: Device Controls
-        show_header_toggle: false
-        entities:
-          - entity: switch.greenhouse_climate_1_ota_mode
-            name: Climate 1 OTA Mode
-          - entity: switch.greenhouse_climate_2_ota_mode
-            name: Climate 2 OTA Mode
-          - entity: switch.greenhouse_soil_1_ota_mode
-            name: Soil 1 OTA Mode
-          - entity: switch.greenhouse_soil_2_ota_mode
-            name: Soil 2 OTA Mode
-          - entity: sensor.greenhouse_soil_1_sleep_status
-            name: Soil 1 Status
-          - entity: sensor.greenhouse_soil_2_sleep_status
-            name: Soil 2 Status
-
-  - title: Climate
-    path: climate
-    icon: mdi:thermometer-lines
-    cards:
-      # Temperature Overview
-      - type: history-graph
-        title: Temperature Trends (24h)
-        entities:
-          - entity: sensor.greenhouse_climate_1_temperature
-          - entity: sensor.greenhouse_climate_2_temperature
-        hours_to_show: 24
-        refresh_interval: 60
-
-      # Humidity Overview  
-      - type: history-graph
-        title: Humidity Trends (24h)
-        entities:
-          - entity: sensor.greenhouse_climate_1_humidity
-          - entity: sensor.greenhouse_climate_2_humidity
-        hours_to_show: 24
-        refresh_interval: 60
-
-      # Current Readings
-      - type: horizontal-stack
-        cards:
-          - type: gauge
-            entity: sensor.greenhouse_climate_1_temperature
-            name: Zone 1 Temperature
-            min: 0
-            max: 40
-            severity:
-              green: 18
-              yellow: 25
-              red: 30
           - type: gauge
             entity: sensor.greenhouse_climate_2_temperature
-            name: Zone 2 Temperature
+            name: Temperature
+            needle: true
             min: 0
-            max: 40
+            max: 45
             severity:
               green: 18
               yellow: 25
               red: 30
-
-      - type: horizontal-stack
-        cards:
-          - type: gauge
-            entity: sensor.greenhouse_climate_1_humidity
-            name: Zone 1 Humidity
-            min: 0
-            max: 100
-            severity:
-              green: 60
-              yellow: 80
-              red: 90
           - type: gauge
             entity: sensor.greenhouse_climate_2_humidity
-            name: Zone 2 Humidity
+            name: Humidity
+            needle: true
             min: 0
             max: 100
-            severity:
-              green: 60
-              yellow: 80
-              red: 90
-
-      # Device Status
-      - type: entities
-        title: Climate Device Status
-        show_header_toggle: false
-        entities:
-          - entity: binary_sensor.greenhouse_climate_1_status
-            name: Zone 1 Device Status
-          - entity: sensor.greenhouse_climate_1_wifi_signal
-            name: Zone 1 WiFi Signal
-          - entity: binary_sensor.greenhouse_climate_2_status
-            name: Zone 2 Device Status
-          - entity: sensor.greenhouse_climate_2_wifi_signal
-            name: Zone 2 WiFi Signal
-
-  - title: Soil Monitoring
-    path: soil
-    icon: mdi:water-percent
-    cards:
-      # Soil Moisture Trends
-      - type: history-graph
-        title: Soil Moisture Trends (48h)
-        entities:
-          - entity: sensor.greenhouse_soil_1_average_vwc
-          - entity: sensor.greenhouse_soil_2_average_vwc
-        hours_to_show: 48
-        refresh_interval: 60
-
-      # Zone 1 Detailed View (Battery Powered)
-      - type: entities
-        title: Soil Zone 1 - Battery Powered Monitor
-        show_header_toggle: false
-        entities:
-          - entity: sensor.greenhouse_soil_1_vwc_sensor_1
-            name: Soil Sensor 1
-          - entity: sensor.greenhouse_soil_1_vwc_sensor_2
-            name: Soil Sensor 2
-          - type: divider
-          - entity: sensor.greenhouse_soil_1_average_vwc
-            name: Zone 1 Average
-          - type: divider
-          - entity: sensor.greenhouse_soil_1_temperature_1
-            name: Soil Temperature 1
-          - entity: sensor.greenhouse_soil_1_temperature_2
-            name: Soil Temperature 2
-          - entity: sensor.greenhouse_soil_1_air_temperature_1
-            name: Air Temperature 1
-          - entity: sensor.greenhouse_soil_1_air_temperature_2
-            name: Air Temperature 2
-          - entity: sensor.greenhouse_soil_1_air_humidity_1
-            name: Air Humidity 1
-          - entity: sensor.greenhouse_soil_1_air_humidity_2
-            name: Air Humidity 2
-
-      # Zone 2 Detailed View (2 sensors + battery)
-      - type: entities
-        title: Soil Zone 2 - Battery Powered Monitor
-        show_header_toggle: false
-        entities:
-          - entity: sensor.greenhouse_soil_2_vwc_sensor_1
-            name: Soil Sensor 1
-          - entity: sensor.greenhouse_soil_2_vwc_sensor_2
-            name: Soil Sensor 2
-          - type: divider
-          - entity: sensor.greenhouse_soil_2_average_vwc
-            name: Zone 2 Average
-          - type: divider
-          - entity: sensor.greenhouse_soil_2_temperature_1
-            name: Soil Temperature 1
-          - entity: sensor.greenhouse_soil_2_temperature_2
-            name: Soil Temperature 2
-          - entity: sensor.greenhouse_soil_2_air_temperature_1
-            name: Air Temperature 1
-          - entity: sensor.greenhouse_soil_2_air_temperature_2
-            name: Air Temperature 2
-          - entity: sensor.greenhouse_soil_2_air_humidity_1
-            name: Air Humidity 1
-          - entity: sensor.greenhouse_soil_2_air_humidity_2
-            name: Air Humidity 2
-
-      # Moisture Status Gauges
-      - type: horizontal-stack
-        cards:
-          - type: gauge
-            entity: sensor.greenhouse_soil_1_average_vwc
-            name: Zone 1 Moisture
-            min: 0
-            max: 75
-            severity:
-              green: 45
-              yellow: 35
-              red: 25
-            needle: true
-          - type: gauge
-            entity: sensor.greenhouse_soil_2_average_vwc
-            name: Zone 2 Moisture
-            min: 0
-            max: 75
-            severity:
-              green: 45
-              yellow: 35
-              red: 25
-            needle: true
-
-      # Individual Sensor Trends - Zone 1
-      - type: history-graph
-        title: Zone 1 - Soil Moisture Trends (24h)
-        entities:
-          - entity: sensor.greenhouse_soil_1_vwc_sensor_1
-          - entity: sensor.greenhouse_soil_1_vwc_sensor_2
-        hours_to_show: 24
-        refresh_interval: 60
-
-      # Individual Sensor Trends - Zone 2 (Battery)
-      - type: history-graph
-        title: Zone 2 - Soil Moisture Trends (24h)
-        entities:
-          - entity: sensor.greenhouse_soil_2_vwc_sensor_1
-          - entity: sensor.greenhouse_soil_2_vwc_sensor_2
-        hours_to_show: 24
-        refresh_interval: 60
-
-  - title: Battery Monitors
-    path: battery
-    icon: mdi:battery
-    cards:
-      # Device Status Header
-      - type: horizontal-stack
-        cards:
-          - type: entity
-            entity: binary_sensor.greenhouse_soil_1_status
-            name: Soil Monitor 1
-            icon: mdi:flower
-            state_color: true
-          - type: entity
-            entity: binary_sensor.greenhouse_soil_2_status
-            name: Soil Monitor 2
-            icon: mdi:flower
-            state_color: true
-
-      # Zone 1 Battery Status
-      - type: horizontal-stack
-        cards:
-          - type: gauge
-            entity: sensor.greenhouse_soil_1_battery_level
-            name: Zone 1 Battery
-            needle: true
             severity:
               green: 40
-              yellow: 20
-              red: 10
-            min: 0
-            max: 100
-            unit: '%'
-            
-          - type: entities
-            entities:
-              - entity: sensor.greenhouse_soil_1_battery_voltage
-                name: Voltage
-                icon: mdi:flash
-              - entity: sensor.greenhouse_soil_1_battery_days_remaining
-                name: Est. Days Left
-                icon: mdi:battery-clock
-              - entity: sensor.greenhouse_soil_1_sleep_status
-                name: Sleep Status
-                icon: mdi:power-sleep
-              - entity: sensor.greenhouse_soil_1_uptime
-                name: Uptime
-                icon: mdi:timer-outline
-              - entity: sensor.greenhouse_soil_1_wifi_rssi
-                name: WiFi Signal
-                icon: mdi:wifi
+              yellow: 70
+              red: 85
 
-      # Zone 2 Battery Status
-      - type: horizontal-stack
-        cards:
-          - type: gauge
-            entity: sensor.greenhouse_soil_2_battery_level
-            name: Zone 2 Battery
-            needle: true
-            severity:
-              green: 40
-              yellow: 20
-              red: 10
-            min: 0
-            max: 100
-            unit: '%'
-            
-          - type: entities
-            entities:
-              - entity: sensor.greenhouse_soil_2_battery_voltage
-                name: Voltage
-                icon: mdi:flash
-              - entity: sensor.greenhouse_soil_2_battery_days_remaining
-                name: Est. Days Left
-                icon: mdi:battery-clock
-              - entity: sensor.greenhouse_soil_2_sleep_status
-                name: Sleep Status
-                icon: mdi:power-sleep
-              - entity: sensor.greenhouse_soil_2_uptime
-                name: Uptime
-                icon: mdi:timer-outline
-              - entity: sensor.greenhouse_soil_2_wifi_rssi
-                name: WiFi Signal
-                icon: mdi:wifi
-
-      # OTA and Device Controls
+      # --- Controls (Shelly 1PM plugs) ---
       - type: entities
-        title: Device Controls
+        title: Controls
         show_header_toggle: false
         entities:
-          - entity: switch.greenhouse_soil_1_ota_mode
-            name: Zone 1 OTA Mode
-            secondary_info: When ON, device stays awake for updates
-          - type: divider
-          - entity: script.soil1_enable_ota
-            name: Wake for Update
-            icon: mdi:upload
-          - entity: script.soil1_disable_ota
-            name: Force Sleep
-            icon: mdi:sleep
-          - entity: script.soil1_mark_battery_charged
-            name: Mark Battery Charged
-            icon: mdi:battery-charging
-          - entity: script.soil1_battery_health_check
-            name: Battery Health Check
-            icon: mdi:battery-heart
-          - type: divider
-          - entity: switch.greenhouse_soil_2_ota_mode
-            name: Zone 2 OTA Mode
-            secondary_info: When ON, device stays awake for updates
-          - type: divider
-          - entity: script.soil2_enable_ota
-            name: Wake for Update
-            icon: mdi:upload
-          - entity: script.soil2_disable_ota
-            name: Force Sleep
-            icon: mdi:sleep
-          - entity: script.soil2_mark_battery_charged
-            name: Mark Battery Charged
-            icon: mdi:battery-charging
-          - entity: script.soil2_battery_health_check
-            name: Battery Health Check
-            icon: mdi:battery-heart
+          - entity: switch.greenhouse_shelly_watering
+            name: "Vanning"
+            icon: mdi:water
+          - entity: switch.greenhouse_shelly_fan_east
+            name: "Vifte endevegg øst"
+            icon: mdi:fan
+          - entity: switch.greenhouse_shelly_fan_west
+            name: "Vifte endevegg vest"
+            icon: mdi:fan
 
-      # Battery Level Trends
-      - type: history-graph
-        title: Battery Levels (7 days)
+      # --- Live power draw (Shelly 1PM) ---
+      - type: entities
+        title: Plug Power
+        show_header_toggle: false
         entities:
-          - entity: sensor.greenhouse_soil_1_battery_level
-            name: Zone 1
-          - entity: sensor.greenhouse_soil_2_battery_level
-            name: Zone 2
-        hours_to_show: 168
-        refresh_interval: 300
+          - entity: sensor.greenhouse_shelly_watering_effekt
+            name: "Vanning – pumpe"
+            icon: mdi:water-pump
+          - entity: sensor.greenhouse_shelly_fan_east_effekt
+            name: "Vifte øst"
+            icon: mdi:fan
+          - entity: sensor.greenhouse_shelly_fan_west_effekt
+            name: "Vifte vest"
+            icon: mdi:fan
 
-  - title: System Health
+      # --- 24h history ---
+      - type: history-graph
+        title: "Temperature & Humidity (24h)"
+        hours_to_show: 24
+        entities:
+          - entity: sensor.greenhouse_climate_2_temperature
+            name: Temperature
+          - entity: sensor.greenhouse_climate_2_humidity
+            name: Humidity
+
+      # --- Outdoor weather ---
+      - type: weather-forecast
+        entity: weather.forecast_hjem
+        forecast_type: daily
+
+  # ==================== SYSTEM & HEALTH ====================
+  - title: System & Health
     path: system
-    icon: mdi:monitor-dashboard
+    icon: mdi:heart-pulse
     cards:
-      # Device Connectivity
       - type: entities
-        title: Device Connectivity
-        show_header_toggle: false
+        title: Climate Sensor Health
         entities:
-          - entity: binary_sensor.greenhouse_soil_1_status
-            name: Soil Zone 1 (Battery)
-          - entity: binary_sensor.greenhouse_soil_2_status
-            name: Soil Zone 2 (Battery)
-          - type: divider
-          - entity: sensor.greenhouse_soil_1_wifi_rssi
-            name: Soil 1 WiFi Signal
-          - entity: sensor.greenhouse_soil_2_wifi_rssi
-            name: Soil 2 WiFi Signal
+          - entity: binary_sensor.greenhouse_climate_2_device_status
+            name: Online
+          - entity: sensor.greenhouse_climate_2_wifi_signal
+            name: WiFi Signal
+          - entity: sensor.greenhouse_climate_2_uptime
+            name: Uptime
 
-      # System Resources 
       - type: entities
-        title: System Resources
-        show_header_toggle: false
+        title: Plug Health
         entities:
-          - entity: sensor.cpu_usage
-            name: CPU Usage
-          - entity: sensor.memory_usage
-            name: Memory Usage
-          - entity: sensor.disk_usage
-            name: Disk Usage
+          - type: section
+            label: "Vanning"
+          - entity: sensor.greenhouse_shelly_watering_signalstyrke
+            name: "Signal"
+          - entity: sensor.greenhouse_shelly_watering_temperatur
+            name: "Temperatur"
+          - entity: sensor.greenhouse_shelly_watering_spenning
+            name: "Nettspenning"
+          - entity: binary_sensor.greenhouse_shelly_watering_overheating
+            name: "Overoppheting"
+          - entity: binary_sensor.greenhouse_shelly_watering_overpowering
+            name: "Overbelastning"
+          - type: section
+            label: "Vifte øst"
+          - entity: sensor.greenhouse_shelly_fan_east_signalstyrke
+            name: "Signal"
+          - entity: sensor.greenhouse_shelly_fan_east_temperatur
+            name: "Temperatur"
+          - entity: sensor.greenhouse_shelly_fan_east_spenning
+            name: "Nettspenning"
+          - entity: binary_sensor.greenhouse_shelly_fan_east_overheating
+            name: "Overoppheting"
+          - entity: binary_sensor.greenhouse_shelly_fan_east_overpowering
+            name: "Overbelastning"
+          - type: section
+            label: "Vifte vest"
+          - entity: sensor.greenhouse_shelly_fan_west_signalstyrke
+            name: "Signal"
+          - entity: sensor.greenhouse_shelly_fan_west_temperatur
+            name: "Temperatur"
+          - entity: sensor.greenhouse_shelly_fan_west_spenning
+            name: "Nettspenning"
+          - entity: binary_sensor.greenhouse_shelly_fan_west_overheating
+            name: "Overoppheting"
+          - entity: binary_sensor.greenhouse_shelly_fan_west_overpowering
+            name: "Overbelastning"
 
-      # Database Health
-      - type: entities
-        title: Database Status
-        show_header_toggle: false
-        entities:
-          - entity: sensor.database_size
-            name: Database Size
-          - entity: sensor.recorder_events
-            name: Recorded Events (24h)
-          - entity: sensor.recorder_states
-            name: Recorded States (24h)
-
-      # Docker Services Status
-      - type: entities
-        title: Docker Services
-        show_header_toggle: false
-        entities:
-          - entity: binary_sensor.homeassistant_container
-            name: Home Assistant
-          - entity: binary_sensor.mariadb_container
-            name: MariaDB
-          - entity: binary_sensor.mosquitto_container
-            name: MQTT Broker
-          - entity: binary_sensor.esphome_container
-            name: ESPHome
-
-      # Maintenance Actions
       - type: entities
         title: Maintenance
-        show_header_toggle: false
         entities:
-          - entity: input_button.restart_homeassistant
-            name: Restart Home Assistant
           - entity: input_button.manual_backup
             name: Manual Backup
-          - type: divider
-          - entity: switch.greenhouse_climate_1_ota_mode
-            name: Climate 1 OTA Mode
-          - entity: switch.greenhouse_climate_2_ota_mode
-            name: Climate 2 OTA Mode
-          - entity: switch.greenhouse_soil_1_ota_mode
-            name: Soil 1 OTA Mode
-          - entity: switch.greenhouse_soil_2_ota_mode
-            name: Soil 2 OTA Mode
-          - type: divider
-          - entity: script.greenhouse_system_health
-            name: System Health Check
-            icon: mdi:heart-pulse
+          - entity: input_button.restart_homeassistant
+            name: Restart Home Assistant
+          - entity: sensor.backup_backup_manager_state
+            name: Backup state
 
-  - title: History
-    path: history
+  # ==================== AUTOMATION ====================
+  - title: Automation
+    path: automation
+    icon: mdi:robot
+    cards:
+      - type: entities
+        title: Master
+        entities:
+          - entity: input_boolean.gh_automation_enabled
+            name: Automation enabled
+          - entity: switch.greenhouse_shelly_fan_east
+            name: Fan øst
+          - entity: switch.greenhouse_shelly_fan_west
+            name: Fan vest
+          - entity: switch.greenhouse_shelly_watering
+            name: Vanning
+      - type: entities
+        title: Thresholds (tune here)
+        entities:
+          - input_number.gh_fan_on_temp
+          - input_number.gh_fan_off_temp
+          - input_number.gh_humidity_max
+          - input_number.gh_humidity_off
+          - input_number.gh_overheat_temp
+          - input_number.gh_overheat_critical
+          - input_number.gh_cold_temp
+
+      - type: entities
+        title: "Watering – tensiometer loop"
+        entities:
+          - entity: input_boolean.gh_watering_closedloop_enabled
+            name: "Closed-loop enabled"
+          - entity: sensor.greenhouse_tensiometer_average_kpa
+            name: "Tension avg"
+          - entity: sensor.greenhouse_tensiometer_1_kpa
+            name: "Tension ch1 (drier)"
+          - type: divider
+          - input_number.gh_tension_on
+          - input_number.gh_tension_ch1_cap
+          - input_number.gh_tension_off
+          - input_number.gh_pulse_minutes
+          - input_number.gh_pulse_wait_minutes
+          - input_number.gh_water_daily_cap_minutes
+          - input_number.gh_pump_min_watts
+          - type: divider
+          - entity: input_number.gh_water_today_minutes
+            name: "Water minutes today"
+          - entity: input_datetime.gh_last_pulse_end
+            name: "Last pulse ended"
+          - entity: switch.greenhouse_shelly_watering
+            name: "Pumpe (Vanning)"
+
+  # ==================== METRICS ====================
+  - title: Metrics
+    path: metrics
     icon: mdi:chart-line
     cards:
-      # Long-term Temperature Trends
-      - type: history-graph
-        title: Temperature History (7 Days)
+      - type: entities
+        title: 💧 Watering
         entities:
-          - entity: sensor.greenhouse_climate_1_temperature
-          - entity: sensor.greenhouse_climate_2_temperature
-          - entity: sensor.greenhouse_soil_1_air_temperature_1
-          - entity: sensor.greenhouse_soil_1_air_temperature_2
-          - entity: sensor.greenhouse_soil_2_air_temperature_1
-          - entity: sensor.greenhouse_soil_2_air_temperature_2
-        hours_to_show: 168
-        refresh_interval: 300
+          - entity: input_datetime.gh_last_watering
+            name: Last watering
+          - entity: input_number.gh_last_watering_minutes
+            name: Last duration
+          - entity: sensor.gh_next_watering
+            name: Next watering
+          - entity: sensor.gh_water_per_plant_24h
+            name: Water/plant (24h)
+          - entity: sensor.gh_water_per_plant_7d_avg
+            name: Water/plant (7-day avg)
+      - type: entities
+        title: 🌡️ Climate averages
+        entities:
+          - entity: sensor.gh_temp_avg_24h
+            name: Temp avg (24h)
+          - entity: sensor.gh_temp_avg_7d
+            name: Temp avg (7-day)
+          - entity: sensor.gh_temp_min_24h
+            name: Temp min (24h)
+          - entity: sensor.gh_temp_max_24h
+            name: Temp max (24h)
+          - entity: sensor.gh_humidity_min_24h
+            name: Humidity min (24h)
+          - entity: sensor.gh_humidity_max_24h
+            name: Humidity max (24h)
+      - type: gauge
+        entity: sensor.gh_vpd
+        name: VPD (kPa)
+        min: 0
+        max: 3.5
+        needle: true
+        severity:
+          green: 0.8
+          yellow: 1.2
+          red: 1.6
+      - type: entities
+        title: 📊 Plant health
+        entities:
+          - entity: sensor.gh_dew_point
+            name: Dew point
+          - entity: sensor.gh_dewpoint_gap
+            name: Temp − dew point gap
+          - entity: sensor.gh_day_night_differential
+            name: Day/night differential
+          - entity: sensor.gh_pollination_window_pct_24h
+            name: In pollination window (24h)
+      - type: gauge
+        entity: sensor.greenhouse_tensiometer_average_kpa
+        name: Soil tension — node 1 (avg)
+        min: 0
+        max: 50
+        needle: true
+        # PROVISIONAL bands — higher kPa = drier. Real setpoints come in Phase 2
+        # from the crop-water-potential reference + the baseline.
+        severity:
+          green: 0
+          yellow: 10
+          red: 25
+      - type: history-graph
+        title: 🌱 Soil tension — dryback (node 1)
+        hours_to_show: 24
+        entities:
+          - entity: sensor.greenhouse_tensiometer_1_kpa
+            name: Sensor 1
+          - entity: sensor.greenhouse_tensiometer_2_kpa
+            name: Sensor 2
+          - entity: sensor.greenhouse_tensiometer_average_kpa
+            name: Average
+      - type: entities
+        title: 🌱 Tensiometers (node 1)
+        entities:
+          - entity: sensor.greenhouse_tensiometer_1_kpa
+            name: Sensor 1 tension
+          - entity: sensor.greenhouse_tensiometer_2_kpa
+            name: Sensor 2 tension
+          - entity: binary_sensor.greenhouse_tensiometer_1_check_prime
+            name: Sensor 1 — refill/re-prime?
+          - entity: binary_sensor.greenhouse_tensiometer_2_check_prime
+            name: Sensor 2 — refill/re-prime?
 
-      # Long-term Humidity Trends
+      # ---- Tensiometer node 2 (XIAO ESP32-C3, .162) ----
+      # NOTE: entity ids for node 2 are greenhouse_tensiometer_2_<channel>_*.
+      # Do not confuse sensor.greenhouse_tensiometer_2_kpa (node 1, channel 2)
+      # with sensor.greenhouse_tensiometer_2_2_kpa (node 2, channel 2).
+      # Display only — node 2 is NOT wired into the closed-loop watering
+      # automation, which still reads node 1 exclusively.
+      - type: gauge
+        entity: sensor.greenhouse_tensiometer_2_average_kpa
+        name: Soil tension — node 2 (avg)
+        min: 0
+        max: 50
+        needle: true
+        # Same PROVISIONAL bands as node 1 — see the note above.
+        severity:
+          green: 0
+          yellow: 10
+          red: 25
       - type: history-graph
-        title: Humidity History (7 Days)
+        title: 🌱 Soil tension — dryback (node 2)
+        hours_to_show: 24
         entities:
-          - entity: sensor.greenhouse_climate_1_humidity
-          - entity: sensor.greenhouse_climate_2_humidity
-          - entity: sensor.greenhouse_soil_1_air_humidity_1
-          - entity: sensor.greenhouse_soil_1_air_humidity_2
-          - entity: sensor.greenhouse_soil_2_air_humidity_1
-          - entity: sensor.greenhouse_soil_2_air_humidity_2
-        hours_to_show: 168
-        refresh_interval: 300
-
-      # Long-term Soil Moisture Trends
-      - type: history-graph
-        title: Soil Moisture History (14 Days)
+          - entity: sensor.greenhouse_tensiometer_2_1_kpa
+            name: Sensor 1
+          - entity: sensor.greenhouse_tensiometer_2_2_kpa
+            name: Sensor 2
+          - entity: sensor.greenhouse_tensiometer_2_average_kpa
+            name: Average
+      - type: entities
+        title: 🌱 Tensiometers (node 2)
         entities:
-          - entity: sensor.greenhouse_soil_1_average_vwc
-          - entity: sensor.greenhouse_soil_2_average_vwc
-        hours_to_show: 336
-        refresh_interval: 600
-
-      # Soil Temperature History
-      - type: history-graph
-        title: Soil Temperature History (7 Days)
-        entities:
-          - entity: sensor.greenhouse_soil_1_temperature_1
-          - entity: sensor.greenhouse_soil_1_temperature_2
-          - entity: sensor.greenhouse_soil_2_temperature_1
-          - entity: sensor.greenhouse_soil_2_temperature_2
-        hours_to_show: 168
-        refresh_interval: 300
-
-      # Battery Level History
-      - type: history-graph
-        title: Battery History (30 Days)
-        entities:
-          - entity: sensor.greenhouse_soil_1_battery_level
-          - entity: sensor.greenhouse_soil_1_battery_voltage
-          - entity: sensor.greenhouse_soil_2_battery_level
-          - entity: sensor.greenhouse_soil_2_battery_voltage
-        hours_to_show: 720
-        refresh_interval: 600
+          - entity: sensor.greenhouse_tensiometer_2_1_kpa
+            name: Sensor 1 tension
+          - entity: sensor.greenhouse_tensiometer_2_2_kpa
+            name: Sensor 2 tension
+          - entity: binary_sensor.greenhouse_tensiometer_2_1_check_prime
+            name: Sensor 1 — refill/re-prime?
+          - entity: binary_sensor.greenhouse_tensiometer_2_2_check_prime
+            name: Sensor 2 — refill/re-prime?
+          - type: divider
+          - entity: binary_sensor.greenhouse_tensiometer_2_status
+            name: Node 2 online
+          - entity: sensor.greenhouse_tensiometer_2_wifi_signal
+            name: Node 2 WiFi

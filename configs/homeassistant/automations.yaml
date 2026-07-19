@@ -1,245 +1,479 @@
-# Automations for Greenhouse Control System
-
-# Manual restart HomeAssistant
-- id: 'manual_restart_homeassistant'
+- id: manual_restart_homeassistant
   alias: "Manual Restart HomeAssistant"
   trigger:
     - platform: event
-      event_type: manual_restart_request
+      event_type: call_service
+      event_data:
+        domain: input_button
+        service: press
+        service_data:
+          entity_id: input_button.restart_homeassistant
   action:
     - service: homeassistant.restart
 
-# Manual backup
-- id: 'manual_backup'
+- id: manual_backup
   alias: "Manual Backup"
   trigger:
     - platform: event
-      event_type: manual_backup_request
+      event_type: call_service
+      event_data:
+        domain: input_button
+        service: press
+        service_data:
+          entity_id: input_button.manual_backup
   action:
     - service: shell_command.manual_backup
 
-# ============== SOIL MONITOR 1 BATTERY AUTOMATIONS ==============
-
-# Set initial OTA mode OFF via MQTT when HA starts
-- id: 'soil1_set_initial_ota_mode'
-  alias: 'Soil 1 - Set Initial OTA Mode'
-  description: 'Set OTA mode to OFF on HA startup via retained MQTT'
+- id: gh_fan_control
+  alias: "GH Fan control (temp/humidity)"
+  mode: single
   trigger:
-    - platform: homeassistant
-      event: start
+    - platform: state
+      entity_id: [sensor.greenhouse_climate_2_temperature, sensor.greenhouse_climate_2_humidity]
+    - platform: time_pattern
+      minutes: "/5"
+  condition:
+    - condition: state
+      entity_id: input_boolean.gh_automation_enabled
+      state: "on"
+    - condition: state
+      entity_id: binary_sensor.greenhouse_climate_2_device_status
+      state: "on"
   action:
-    - service: mqtt.publish
-      data:
-        topic: "greenhouse/soil1/ota_mode/set"
-        payload: "OFF"
-        retain: true
-    - service: system_log.write
-      data:
-        message: "Set Soil Monitor 1 OTA mode to OFF (retained)"
-        level: info
+    - variables:
+        t: "{{ states('sensor.greenhouse_climate_2_temperature') | float(0) }}"
+        h: "{{ states('sensor.greenhouse_climate_2_humidity') | float(0) }}"
+        on_t: "{{ states('input_number.gh_fan_on_temp') | float(25) }}"
+        off_t: "{{ states('input_number.gh_fan_off_temp') | float(23) }}"
+        h_max: "{{ states('input_number.gh_humidity_max') | float(80) }}"
+        h_off: "{{ states('input_number.gh_humidity_off') | float(72) }}"
+        day: "{{ is_state('sun.sun','above_horizon') }}"
+        fans_on: "{{ is_state('switch.greenhouse_shelly_fan_east','on') }}"
+        want_on: "{{ (t >= on_t) or (day and h >= h_max) or ((not day) and h > 85) }}"
+        want_off: "{{ (t <= off_t) and ((day and h <= h_off) or ((not day) and h <= 83)) }}"
+    - choose:
+        - conditions: "{{ want_on and not fans_on }}"
+          sequence:
+            - service: switch.turn_on
+              target: {entity_id: [switch.greenhouse_shelly_fan_east, switch.greenhouse_shelly_fan_west]}
+        - conditions: "{{ want_off and fans_on }}"
+          sequence:
+            - service: switch.turn_off
+              target: {entity_id: [switch.greenhouse_shelly_fan_east, switch.greenhouse_shelly_fan_west]}
 
-# Low battery alert (20%)
-- id: 'soil1_low_battery_alert'
-  alias: 'Soil 1 - Low Battery Alert'
-  description: 'Alert when battery level drops below 20%'
+- id: gh_fan_circulation
+  alias: "GH Fan circulation (daylight)"
+  mode: single
+  trigger:
+    - platform: time_pattern
+      minutes: "0"
+  condition:
+    - condition: state
+      entity_id: input_boolean.gh_automation_enabled
+      state: "on"
+    - condition: state
+      entity_id: sun.sun
+      state: "above_horizon"
+    - condition: state
+      entity_id: switch.greenhouse_shelly_fan_east
+      state: "off"
+  action:
+    - service: switch.turn_on
+      target: {entity_id: [switch.greenhouse_shelly_fan_east, switch.greenhouse_shelly_fan_west]}
+    - delay: "00:10:00"
+    # only turn back off if the climate automation didn't latch them on for cooling
+    - condition: template
+      value_template: "{{ (states('sensor.greenhouse_climate_2_temperature')|float(0)) < (states('input_number.gh_fan_on_temp')|float(25)) and (states('sensor.greenhouse_climate_2_humidity')|float(0)) < (states('input_number.gh_humidity_max')|float(80)) }}"
+    - service: switch.turn_off
+      target: {entity_id: [switch.greenhouse_shelly_fan_east, switch.greenhouse_shelly_fan_west]}
+
+# ==================== TASK 4: SAFETY ALERTS ====================
+
+- id: gh_alert_overheat
+  alias: "GH Alert overheat"
+  mode: single
   trigger:
     - platform: numeric_state
-      entity_id: sensor.greenhouse_soil_1_battery_level
-      below: 20
+      entity_id: sensor.greenhouse_climate_2_temperature
+      above: input_number.gh_overheat_temp
+      for: "00:02:00"
+  condition:
+    - condition: state
+      entity_id: input_boolean.gh_automation_enabled
+      state: "on"
   action:
-    - service: notify.persistent_notification
+    - service: script.gh_notify
       data:
-        title: "⚠️ Low Battery - Soil Monitor 1"
-        message: >
-          Battery: {{ states('sensor.greenhouse_soil_1_battery_level') }}%
-          Voltage: {{ states('sensor.greenhouse_soil_1_battery_voltage') }}V
-          Days remaining: {{ states('sensor.greenhouse_soil_1_battery_days_remaining') }}
+        title: "🌡️ Greenhouse hot ({{ states('sensor.greenhouse_climate_2_temperature') }}°C)"
+        message: "Above {{ states('input_number.gh_overheat_temp') }}°C — pollination at risk. Open the roll-up wall."
+    - delay: "00:30:00"   # rate-limit re-fire
 
-# Critical battery alert (10%)
-- id: 'soil1_critical_battery_alert'
-  alias: 'Soil 1 - Critical Battery Alert'
-  description: 'Critical alert when battery level drops below 10%'
+- id: gh_alert_overheat_critical
+  alias: "GH Alert overheat critical"
+  mode: single
   trigger:
     - platform: numeric_state
-      entity_id: sensor.greenhouse_soil_1_battery_level
-      below: 10
+      entity_id: sensor.greenhouse_climate_2_temperature
+      above: input_number.gh_overheat_critical
+      for: "00:01:00"
+  condition:
+    - condition: state
+      entity_id: input_boolean.gh_automation_enabled
+      state: "on"
   action:
-    - service: notify.persistent_notification
+    - service: script.gh_notify
       data:
-        title: "🔴 CRITICAL Battery - Soil Monitor 1"
-        message: >
-          CRITICAL: Battery level is {{ states('sensor.greenhouse_soil_1_battery_level') }}%.
-          The device may stop functioning soon. Immediate action required!
-    - service: notify.critical_alerts
-      data:
-        title: "CRITICAL: Soil Monitor 1 Battery"
-        message: >
-          Battery level critically low at {{ states('sensor.greenhouse_soil_1_battery_level') }}%.
-          Device may shut down imminently.
+        title: "🔥 GREENHOUSE OVERHEATING ({{ states('sensor.greenhouse_climate_2_temperature') }}°C)"
+        message: "Critical. Max ventilation now — open wall fully."
+    - delay: "00:15:00"
 
-# Extended offline alert (considering deep sleep)
-- id: 'soil1_extended_offline_alert'
-  alias: 'Soil 1 - Extended Offline Alert'
-  description: 'Alert if device hasnt reported for over 30 minutes (2x sleep cycle)'
-  trigger:
-    - platform: state
-      entity_id: binary_sensor.greenhouse_soil_1_extended_offline
-      to: 'on'
-      for:
-        minutes: 5
-  action:
-    - service: notify.persistent_notification
-      data:
-        title: "⚠️ Soil Monitor 1 Extended Offline"
-        message: >
-          Device has not reported for over 30 minutes.
-          Last battery level: {{ states('sensor.greenhouse_soil_1_battery_level') }}%.
-          This may indicate connectivity issues or dead battery.
-
-# OTA mode reminder if left on too long
-- id: 'soil1_ota_mode_reminder'
-  alias: 'Soil 1 - OTA Mode Active Reminder'
-  description: 'Remind to disable OTA mode if left on for too long'
-  trigger:
-    - platform: state
-      entity_id: switch.greenhouse_soil_1_ota_mode
-      to: 'on'
-      for:
-        hours: 1
-  action:
-    - service: notify.persistent_notification
-      data:
-        title: "📡 OTA Mode Still Active - Soil Monitor 1"
-        message: >
-          OTA mode has been active for over 1 hour.
-          Battery level: {{ states('sensor.greenhouse_soil_1_battery_level') }}%.
-          Consider disabling OTA mode to preserve battery life.
-
-# Device overheating alert
-- id: 'soil1_overheating_alert'
-  alias: 'Soil 1 - Device Overheating Alert'
-  description: 'Alert when device temperature exceeds safe limits'
-  trigger:
-    - platform: state
-      entity_id: binary_sensor.greenhouse_soil_1_overheating
-      to: 'on'
-  action:
-    - service: notify.persistent_notification
-      data:
-        title: "🌡️ Device Overheating - Soil Monitor 1"
-        message: >
-          Device temperature is {{ states('sensor.greenhouse_soil_1_device_temperature') }}°C.
-          This may indicate hardware issues or poor ventilation.
-
-# ============== SOIL MONITOR 2 BATTERY AUTOMATIONS ==============
-
-# Set initial OTA mode OFF via MQTT when HA starts
-- id: 'soil2_set_initial_ota_mode'
-  alias: 'Soil 2 - Set Initial OTA Mode'
-  description: 'Set OTA mode to OFF on HA startup via retained MQTT'
-  trigger:
-    - platform: homeassistant
-      event: start
-  action:
-    - service: mqtt.publish
-      data:
-        topic: "greenhouse/soil2/ota_mode/set"
-        payload: "OFF"
-        retain: true
-    - service: system_log.write
-      data:
-        message: "Set Soil Monitor 2 OTA mode to OFF (retained)"
-        level: info
-
-# Low battery alert (20%)
-- id: 'soil2_low_battery_alert'
-  alias: 'Soil 2 - Low Battery Alert'
-  description: 'Alert when battery level drops below 20%'
+- id: gh_alert_cold
+  alias: "GH Alert cold"
+  mode: single
   trigger:
     - platform: numeric_state
-      entity_id: sensor.greenhouse_soil_2_battery_level
-      below: 20
+      entity_id: sensor.greenhouse_climate_2_temperature
+      below: input_number.gh_cold_temp
+      for: "00:05:00"
+  condition:
+    - condition: state
+      entity_id: input_boolean.gh_automation_enabled
+      state: "on"
   action:
-    - service: notify.persistent_notification
+    - service: script.gh_notify
       data:
-        title: "⚠️ Low Battery - Soil Monitor 2"
-        message: >
-          Battery: {{ states('sensor.greenhouse_soil_2_battery_level') }}%
-          Voltage: {{ states('sensor.greenhouse_soil_2_battery_voltage') }}V
-          Days remaining: {{ states('sensor.greenhouse_soil_2_battery_days_remaining') }}
+        title: "❄️ Greenhouse cold ({{ states('sensor.greenhouse_climate_2_temperature') }}°C)"
+        message: "Below {{ states('input_number.gh_cold_temp') }}°C — close the wall / check overnight."
+    - delay: "00:30:00"
 
-# Critical battery alert (10%)
-- id: 'soil2_critical_battery_alert'
-  alias: 'Soil 2 - Critical Battery Alert'
-  description: 'Critical alert when battery level drops below 10%'
+# ==================== TASK 5: HUMIDITY ALERT ====================
+
+- id: gh_alert_humidity
+  alias: "GH Alert humidity out of range"
+  mode: single
   trigger:
     - platform: numeric_state
-      entity_id: sensor.greenhouse_soil_2_battery_level
-      below: 10
+      entity_id: sensor.greenhouse_climate_2_humidity
+      above: 85
+      for: "00:10:00"
+    - platform: numeric_state
+      entity_id: sensor.greenhouse_climate_2_humidity
+      below: 55
+      for: "00:10:00"
+  condition:
+    - condition: state
+      entity_id: input_boolean.gh_automation_enabled
+      state: "on"
+    - condition: state
+      entity_id: sun.sun
+      state: "above_horizon"
   action:
-    - service: notify.persistent_notification
+    - service: script.gh_notify
       data:
-        title: "🔴 CRITICAL Battery - Soil Monitor 2"
-        message: >
-          CRITICAL: Battery level is {{ states('sensor.greenhouse_soil_2_battery_level') }}%.
-          The device may stop functioning soon. Immediate action required!
-    - service: notify.critical_alerts
-      data:
-        title: "CRITICAL: Soil Monitor 2 Battery"
-        message: >
-          Battery level critically low at {{ states('sensor.greenhouse_soil_2_battery_level') }}%.
-          Device may shut down imminently.
+        title: "💧 Humidity {{ states('sensor.greenhouse_climate_2_humidity') }}%"
+        message: >-
+          {{ 'High (>85%) — botrytis risk, increase ventilation.' if (states('sensor.greenhouse_climate_2_humidity')|float(0)) > 85 else 'Low (<55%) — stigma may dry, mist/reduce ventilation.' }}
+    - delay: "00:30:00"
 
-# Extended offline alert (considering deep sleep)
-- id: 'soil2_extended_offline_alert'
-  alias: 'Soil 2 - Extended Offline Alert'
-  description: 'Alert if device hasnt reported for over 30 minutes (2x sleep cycle)'
+# ==================== TASK 6: SENSOR-OFFLINE ALERT ====================
+
+- id: gh_alert_sensor_offline
+  alias: "GH Alert climate sensor offline"
+  mode: single
   trigger:
     - platform: state
-      entity_id: binary_sensor.greenhouse_soil_2_extended_offline
-      to: 'on'
-      for:
-        minutes: 5  # Give it 5 extra minutes to be sure
+      entity_id: binary_sensor.greenhouse_climate_2_device_status
+      to: "off"
+      for: "00:15:00"
+    - platform: state
+      entity_id: binary_sensor.greenhouse_climate_2_device_status
+      to: "unavailable"
+      for: "00:15:00"
+  condition:
+    - condition: state
+      entity_id: input_boolean.gh_automation_enabled
+      state: "on"
   action:
-    - service: notify.persistent_notification
+    - service: script.gh_notify
       data:
-        title: "⚠️ Soil Monitor 2 Extended Offline"
-        message: >
-          Device has not reported for over 30 minutes.
-          Last battery level: {{ states('sensor.greenhouse_soil_2_battery_level') }}%.
-          This may indicate connectivity issues or dead battery.
+        title: "📡 Climate sensor offline"
+        message: "greenhouse-climate-2 has been offline 15 min — automation is running blind."
 
-# OTA mode reminder if left on too long
-- id: 'soil2_ota_mode_reminder'
-  alias: 'Soil 2 - OTA Mode Active Reminder'
-  description: 'Remind to disable OTA mode if left on for too long'
+# ==================== TASK 8: ROLL-UP WALL PROMPTS ====================
+
+- id: gh_wall_open_prompt
+  alias: "GH Wall - open prompt"
+  mode: single
+  trigger:
+    - platform: numeric_state
+      entity_id: sensor.greenhouse_climate_2_temperature
+      above: 27
+      for: "00:05:00"
+  condition:
+    - condition: state
+      entity_id: input_boolean.gh_automation_enabled
+      state: "on"
+    - condition: state
+      entity_id: sun.sun
+      state: "above_horizon"
+  action:
+    - service: script.gh_notify
+      data:
+        title: "🪟 Open the roll-up wall"
+        message: "{{ states('sensor.greenhouse_climate_2_temperature') }}°C and climbing — fans alone may not hold it."
+    - delay: "01:00:00"
+
+- id: gh_wall_close_prompt
+  alias: "GH Wall - close prompt"
+  mode: single
+  trigger:
+    - platform: numeric_state
+      entity_id: sensor.greenhouse_climate_2_temperature
+      below: 18
+      for: "00:15:00"
+  condition:
+    - condition: state
+      entity_id: input_boolean.gh_automation_enabled
+      state: "on"
+  action:
+    - service: script.gh_notify
+      data:
+        title: "🪟 Close the roll-up wall"
+        message: "Down to {{ states('sensor.greenhouse_climate_2_temperature') }}°C — close up to hold night target (17–18.5°C)."
+    - delay: "01:00:00"
+
+# ==================== TASK 9: BASE WATERING PULSES (leaner, cut 2026-07-05) ====================
+# 3 morning-weighted pulses, ~25 min/day (was ~70). Nothing after 12:00 -> long
+# afternoon/overnight dry-back. Tune durations by watching the tensiometer dry-back.
+
+- id: gh_water_0700
+  alias: "GH Water 07:00 (10m)"
+  mode: single
+  trigger:
+    - platform: time
+      at: "07:00:00"
+  condition:
+    - condition: state
+      entity_id: input_boolean.gh_automation_enabled
+      state: "on"
+    - condition: state
+      entity_id: input_boolean.gh_watering_ha_enabled
+      state: "on"
+    - condition: template
+      value_template: >-
+        {{ is_state('input_boolean.gh_watering_closedloop_enabled','off')
+           or states('sensor.greenhouse_tensiometer_average_kpa') in ['unavailable','unknown'] }}
+  action:
+    - service: switch.turn_on
+      target: {entity_id: switch.greenhouse_shelly_watering}
+    - delay: "00:10:00"
+    - service: switch.turn_off
+      target: {entity_id: switch.greenhouse_shelly_watering}
+
+- id: gh_water_1000
+  alias: "GH Water 10:00 (8m)"
+  mode: single
+  trigger:
+    - platform: time
+      at: "10:00:00"
+  condition:
+    - condition: state
+      entity_id: input_boolean.gh_automation_enabled
+      state: "on"
+    - condition: state
+      entity_id: input_boolean.gh_watering_ha_enabled
+      state: "on"
+    - condition: template
+      value_template: >-
+        {{ is_state('input_boolean.gh_watering_closedloop_enabled','off')
+           or states('sensor.greenhouse_tensiometer_average_kpa') in ['unavailable','unknown'] }}
+  action:
+    - service: switch.turn_on
+      target: {entity_id: switch.greenhouse_shelly_watering}
+    - delay: "00:08:00"
+    - service: switch.turn_off
+      target: {entity_id: switch.greenhouse_shelly_watering}
+
+- id: gh_water_1200
+  alias: "GH Water 12:00 (7m)"
+  mode: single
+  trigger:
+    - platform: time
+      at: "12:00:00"
+  condition:
+    - condition: state
+      entity_id: input_boolean.gh_automation_enabled
+      state: "on"
+    - condition: state
+      entity_id: input_boolean.gh_watering_ha_enabled
+      state: "on"
+    - condition: template
+      value_template: >-
+        {{ is_state('input_boolean.gh_watering_closedloop_enabled','off')
+           or states('sensor.greenhouse_tensiometer_average_kpa') in ['unavailable','unknown'] }}
+  action:
+    - service: switch.turn_on
+      target: {entity_id: switch.greenhouse_shelly_watering}
+    - delay: "00:07:00"
+    - service: switch.turn_off
+      target: {entity_id: switch.greenhouse_shelly_watering}
+
+- id: gh_water_watchdog
+  alias: "GH Watering watchdog (force-off stuck pump)"
+  mode: single
   trigger:
     - platform: state
-      entity_id: switch.greenhouse_soil_2_ota_mode
-      to: 'on'
-      for:
-        hours: 1
+      entity_id: switch.greenhouse_shelly_watering
+      to: "on"
+      for: "00:16:00"
+  condition:
+    - condition: state
+      entity_id: input_boolean.gh_watering_ha_enabled
+      state: "on"
   action:
-    - service: notify.persistent_notification
+    - service: switch.turn_off
+      target: {entity_id: switch.greenhouse_shelly_watering}
+    - service: script.gh_notify
       data:
-        title: "📡 OTA Mode Still Active - Soil Monitor 2"
-        message: >
-          OTA mode has been active for over 1 hour.
-          Battery level: {{ states('sensor.greenhouse_soil_2_battery_level') }}%.
-          Consider disabling OTA mode to preserve battery life.
+        title: "💧 Watering watchdog"
+        message: "Vanning pump was on >16 min — forced off (possible stuck pulse after a restart)."
 
-# Device overheating alert
-- id: 'soil2_overheating_alert'
-  alias: 'Soil 2 - Device Overheating Alert'
-  description: 'Alert when device temperature exceeds safe limits'
+- id: gh_watering_tracker
+  alias: "GH Watering tracker (record last/duration)"
+  mode: queued
   trigger:
     - platform: state
-      entity_id: binary_sensor.greenhouse_soil_2_overheating
-      to: 'on'
+      entity_id: switch.greenhouse_shelly_watering
+      to: "on"
+      id: started
+    - platform: state
+      entity_id: switch.greenhouse_shelly_watering
+      to: "off"
+      id: stopped
   action:
-    - service: notify.persistent_notification
+    - choose:
+        - conditions: "{{ trigger.id == 'started' }}"
+          sequence:
+            - service: input_datetime.set_datetime
+              target: {entity_id: input_datetime.gh_watering_started}
+              data: {datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"}
+        - conditions: "{{ trigger.id == 'stopped' }}"
+          sequence:
+            - service: input_datetime.set_datetime
+              target: {entity_id: input_datetime.gh_last_watering}
+              data: {datetime: "{{ states('input_datetime.gh_watering_started') }}"}
+            - service: input_number.set_value
+              target: {entity_id: input_number.gh_last_watering_minutes}
+              data:
+                value: >-
+                  {{ ((now().timestamp() - as_timestamp(states('input_datetime.gh_watering_started'))) / 60) | round(0) }}
+            - service: input_datetime.set_datetime
+              target: {entity_id: input_datetime.gh_last_pulse_end}
+              data: {datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"}
+            - service: input_number.set_value
+              target: {entity_id: input_number.gh_water_today_minutes}
+              data:
+                value: >-
+                  {{ (states('input_number.gh_water_today_minutes') | float(0))
+                     + ((now().timestamp() - as_timestamp(states('input_datetime.gh_watering_started'))) / 60) | round(1) }}
+
+- id: gh_water_daily_reset
+  alias: "GH Water - reset daily counter"
+  mode: single
+  trigger:
+    - platform: time
+      at: "00:00:00"
+  action:
+    - service: input_number.set_value
+      target: {entity_id: input_number.gh_water_today_minutes}
+      data: {value: 0}
+
+- id: gh_water_tension_loop
+  alias: "GH Water - tensiometer closed loop"
+  mode: single
+  max_exceeded: silent
+  trigger:
+    - platform: time_pattern
+      minutes: "/5"
+    - platform: numeric_state
+      entity_id: sensor.greenhouse_tensiometer_average_kpa
+      above: input_number.gh_tension_on
+  condition:
+    # --- master gates ---
+    - condition: state
+      entity_id: input_boolean.gh_automation_enabled
+      state: "on"
+    - condition: state
+      entity_id: input_boolean.gh_watering_ha_enabled
+      state: "on"
+    - condition: state
+      entity_id: input_boolean.gh_watering_closedloop_enabled
+      state: "on"
+    # --- sensor valid (covers device-offline AND fault-guard NaN) ---
+    - condition: template
+      value_template: "{{ states('sensor.greenhouse_tensiometer_average_kpa') not in ['unavailable','unknown'] }}"
+    # --- inside the daytime window ---
+    - condition: template
+      value_template: >-
+        {{ today_at(states('input_datetime.gh_water_window_start')) <= now()
+           <= today_at(states('input_datetime.gh_water_window_end')) }}
+    # --- min interval since last pulse ended (covers tensiometer lag) ---
+    - condition: template
+      value_template: >-
+        {{ (now().timestamp() - (state_attr('input_datetime.gh_last_pulse_end','timestamp') | float(0)))
+           > (states('input_number.gh_pulse_wait_minutes') | float(30)) * 60 }}
+    # --- tension trip: avg over on-setpoint OR drier probe over cap; and not already wet ---
+    - condition: template
+      value_template: >-
+        {% set avg = states('sensor.greenhouse_tensiometer_average_kpa') | float(0) %}
+        {% set ch1 = states('sensor.greenhouse_tensiometer_1_kpa') | float(0) %}
+        {% set on = states('input_number.gh_tension_on') | float(30) %}
+        {% set off = states('input_number.gh_tension_off') | float(12) %}
+        {% set cap = states('input_number.gh_tension_ch1_cap') | float(40) %}
+        {{ (avg >= on or ch1 >= cap) and avg > off }}
+    # --- under the daily runtime cap ---
+    - condition: template
+      value_template: >-
+        {{ (states('input_number.gh_water_today_minutes') | float(0))
+           + (states('input_number.gh_pulse_minutes') | float(13))
+           <= (states('input_number.gh_water_daily_cap_minutes') | float(90)) }}
+  action:
+    - service: switch.turn_on
+      target: {entity_id: switch.greenhouse_shelly_watering}
+    - delay:
+        minutes: "{{ states('input_number.gh_pulse_minutes') | int(13) }}"
+    - service: switch.turn_off
+      target: {entity_id: switch.greenhouse_shelly_watering}
+
+- id: gh_water_no_flow_alert
+  alias: "GH Watering no-flow alert (pump drawing no power)"
+  mode: single
+  trigger:
+    - platform: state
+      entity_id: switch.greenhouse_shelly_watering
+      to: "on"
+      for: "00:02:00"
+  condition:
+    # still on — guards against a pulse that ended during the settle window
+    - condition: state
+      entity_id: switch.greenhouse_shelly_watering
+      state: "on"
+    # power sensor must be reporting a real number; if it is unavailable we
+    # cannot conclude anything, so stay silent rather than cry wolf
+    - condition: template
+      value_template: >-
+        {{ states('sensor.greenhouse_shelly_watering_effekt')
+           not in ['unavailable','unknown','none',''] }}
+    - condition: template
+      value_template: >-
+        {{ (states('sensor.greenhouse_shelly_watering_effekt') | float(9999))
+           < (states('input_number.gh_pump_min_watts') | float(30)) }}
+  action:
+    - service: script.gh_notify
       data:
-        title: "🌡️ Device Overheating - Soil Monitor 2"
-        message: >
-          Device temperature is {{ states('sensor.greenhouse_soil_2_device_temperature') }}°C.
-          This may indicate hardware issues or poor ventilation.
+        title: "🚱 Vanning: ingen strømtrekk"
+        message: >-
+          Pumpen er kommandert PÅ men trekker bare
+          {{ states('sensor.greenhouse_shelly_watering_effekt') }} W
+          (grense {{ states('input_number.gh_pump_min_watts') }} W).
+          Sjekk pumpe, sikring og kobling — vanning kan ha stoppet.

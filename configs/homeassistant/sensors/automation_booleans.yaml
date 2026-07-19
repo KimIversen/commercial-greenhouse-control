@@ -1,0 +1,11 @@
+gh_automation_enabled:
+  name: "Greenhouse automation enabled"
+  icon: mdi:robot
+
+gh_watering_ha_enabled:
+  name: "Greenhouse watering via HA"
+  icon: mdi:water-pump
+
+gh_watering_closedloop_enabled:
+  name: "Watering: tensiometer closed-loop"
+  icon: mdi:valve

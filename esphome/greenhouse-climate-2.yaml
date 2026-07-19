@@ -1,0 +1,104 @@
+substitutions:
+  device_name: "greenhouse-climate-2"
+  friendly_name: "Greenhouse Climate 2"
+  device_ip: "192.168.10.151"
+  mqtt_topic: "greenhouse/climate2"
+  dht_pin: GPIO2
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+
+esp32:
+  board: seeed_xiao_esp32c3
+  framework:
+    type: arduino
+
+logger:
+  level: INFO
+
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret hiwifi_ssid
+  password: !secret hiwifi_password
+  fast_connect: true
+  manual_ip:
+    static_ip: ${device_ip}      # 192.168.10.151 (free, on the Hi-Wifi/192.168.10.x subnet)
+    gateway: 192.168.10.1
+    subnet: 255.255.255.0
+    dns1: 192.168.10.1
+
+mqtt:
+  broker: !secret mqtt_broker
+  username: !secret mqtt_username
+  password: !secret mqtt_password
+  birth_message:
+    topic: ${mqtt_topic}/status
+    payload: online
+    retain: true
+  will_message:
+    topic: ${mqtt_topic}/status
+    payload: offline
+    retain: true
+
+sensor:
+  - platform: dht
+    pin: ${dht_pin}
+    model: DHT22
+    temperature:
+      name: "Temperature"
+      id: temperature
+      filters:
+        - sliding_window_moving_average:
+            window_size: 5
+            send_every: 3
+      on_value:
+        then:
+          - mqtt.publish:
+              topic: ${mqtt_topic}/temperature
+              payload: !lambda 'return to_string(id(temperature).state);'
+              retain: true
+    humidity:
+      name: "Humidity"
+      id: humidity
+      filters:
+        - sliding_window_moving_average:
+            window_size: 5
+            send_every: 3
+      on_value:
+        then:
+          - mqtt.publish:
+              topic: ${mqtt_topic}/humidity
+              payload: !lambda 'return to_string(id(humidity).state);'
+              retain: true
+    update_interval: 30s
+
+  - platform: wifi_signal
+    name: "WiFi Signal"
+    update_interval: 60s
+    entity_category: diagnostic
+
+  - platform: uptime
+    name: "Uptime"
+    entity_category: diagnostic
+
+binary_sensor:
+  - platform: status
+    name: "Device Status"
+
+button:
+  - platform: restart
+    name: "Restart"
+    entity_category: config
+
+status_led:
+  pin:
+    number: GPIO10
+    inverted: true

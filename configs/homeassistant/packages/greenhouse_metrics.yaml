@@ -1,0 +1,194 @@
+input_datetime:
+  gh_watering_started: {name: "Watering started", has_date: true, has_time: true}
+  gh_last_watering: {name: "Last watering", has_date: true, has_time: true}
+  gh_last_pulse_end: {name: "Last pulse ended", has_date: true, has_time: true}
+  gh_water_window_start: {name: "Water window start", has_time: true, initial: "06:00:00"}
+  gh_water_window_end: {name: "Water window end", has_time: true, initial: "18:00:00"}
+
+input_number:
+  gh_last_watering_minutes:
+    name: "Last watering duration"
+    min: 0
+    max: 120
+    step: 1
+    unit_of_measurement: "min"
+    icon: mdi:timer-outline
+
+template:
+  - sensor:
+      - name: "GH VPD"
+        unique_id: gh_vpd
+        unit_of_measurement: "kPa"
+        state_class: measurement
+        icon: mdi:water-opacity
+        availability: "{{ states('sensor.greenhouse_climate_2_temperature') not in ['unknown','unavailable'] and states('sensor.greenhouse_climate_2_humidity') not in ['unknown','unavailable'] }}"
+        state: >-
+          {% set t = states('sensor.greenhouse_climate_2_temperature') | float %}
+          {% set h = states('sensor.greenhouse_climate_2_humidity') | float %}
+          {% set svp = 0.6108 * (2.718281828 ** (17.27 * t / (t + 237.3))) %}
+          {{ (svp * (1 - h / 100)) | round(2) }}
+      - name: "GH Dew Point"
+        unique_id: gh_dew_point
+        unit_of_measurement: "°C"
+        device_class: temperature
+        availability: "{{ states('sensor.greenhouse_climate_2_temperature') not in ['unknown','unavailable'] and (states('sensor.greenhouse_climate_2_humidity') | float(0)) > 0 }}"
+        state: >-
+          {% set t = states('sensor.greenhouse_climate_2_temperature') | float %}
+          {% set h = states('sensor.greenhouse_climate_2_humidity') | float %}
+          {% set g = (17.27 * t) / (237.3 + t) + log(h / 100) %}
+          {{ ((237.3 * g) / (17.27 - g)) | round(1) }}
+      - name: "GH Dewpoint Gap"
+        unique_id: gh_dewpoint_gap
+        unit_of_measurement: "°C"
+        availability: "{{ states('sensor.gh_dew_point') not in ['unknown','unavailable'] }}"
+        state: "{{ ((states('sensor.greenhouse_climate_2_temperature') | float) - (states('sensor.gh_dew_point') | float)) | round(1) }}"
+      - name: "GH Temp Day"
+        unique_id: gh_temp_day
+        unit_of_measurement: "°C"
+        device_class: temperature
+        availability: "{{ is_state('sun.sun','above_horizon') and states('sensor.greenhouse_climate_2_temperature') not in ['unknown','unavailable'] }}"
+        state: "{{ states('sensor.greenhouse_climate_2_temperature') }}"
+      - name: "GH Temp Night"
+        unique_id: gh_temp_night
+        unit_of_measurement: "°C"
+        device_class: temperature
+        availability: "{{ is_state('sun.sun','below_horizon') and states('sensor.greenhouse_climate_2_temperature') not in ['unknown','unavailable'] }}"
+        state: "{{ states('sensor.greenhouse_climate_2_temperature') }}"
+      - name: "GH Day Night Differential"
+        unique_id: gh_day_night_dif
+        unit_of_measurement: "°C"
+        availability: "{{ states('sensor.gh_temp_day_avg') not in ['unknown','unavailable'] and states('sensor.gh_temp_night_avg') not in ['unknown','unavailable'] }}"
+        state: "{{ ((states('sensor.gh_temp_day_avg') | float) - (states('sensor.gh_temp_night_avg') | float)) | round(1) }}"
+      - name: "GH Water Per Plant 24h"
+        unique_id: gh_water_per_plant_24h
+        unit_of_measurement: "L"
+        icon: mdi:water
+        state: "{{ ((states('sensor.gh_water_ontime_24h') | float(0)) * 2) | round(2) }}"
+      - name: "GH Water Per Plant 7d Avg"
+        unique_id: gh_water_per_plant_7d_avg
+        unit_of_measurement: "L"
+        icon: mdi:water-outline
+        state: "{{ ((states('sensor.gh_water_ontime_7d') | float(0)) * 2 / 7) | round(2) }}"
+      - name: "GH Pollination Window Pct 24h"
+        unique_id: gh_pollination_pct_24h
+        unit_of_measurement: "%"
+        icon: mdi:flower
+        state: "{{ ((states('sensor.gh_pollination_window_24h') | float(0)) / 24 * 100) | round(0) }}"
+      - name: "GH Next Watering"
+        unique_id: gh_next_watering
+        icon: mdi:water-clock
+        state: >-
+          {% set sched = [['07:00',20],['09:00',15],['11:00',10],['13:00',10],['15:00',15]] %}
+          {% set ns = namespace(t=none, d=20) %}
+          {% for hm, dur in sched %}
+            {% if ns.t is none and today_at(hm) > now() %}{% set ns.t = today_at(hm) %}{% set ns.d = dur %}{% endif %}
+          {% endfor %}
+          {% if ns.t is none %}{% set ns.t = today_at('07:00') + timedelta(days=1) %}{% set ns.d = 20 %}{% endif %}
+          {{ ns.t.strftime('%H:%M') }} · {{ ns.d }} min
+        attributes:
+          duration_min: >-
+            {% set sched = [['07:00',20],['09:00',15],['11:00',10],['13:00',10],['15:00',15]] %}
+            {% set ns = namespace(d=20, found=false) %}
+            {% for hm, dur in sched %}
+              {% if not ns.found and today_at(hm) > now() %}{% set ns.d = dur %}{% set ns.found = true %}{% endif %}
+            {% endfor %}
+            {{ ns.d }}
+  - binary_sensor:
+      - name: "GH In Pollination Window"
+        unique_id: gh_in_pollination_window
+        icon: mdi:flower
+        availability: "{{ states('sensor.greenhouse_climate_2_temperature') not in ['unknown','unavailable'] and states('sensor.greenhouse_climate_2_humidity') not in ['unknown','unavailable'] }}"
+        state: >-
+          {% set t = states('sensor.greenhouse_climate_2_temperature') | float %}
+          {% set h = states('sensor.greenhouse_climate_2_humidity') | float %}
+          {{ 18 <= t <= 29 and 60 <= h <= 80 }}
+
+sensor:
+  - platform: statistics
+    name: "GH Temp Avg 24h"
+    unique_id: gh_temp_avg_24h
+    entity_id: sensor.greenhouse_climate_2_temperature
+    state_characteristic: mean
+    sampling_size: 2000
+    max_age: {hours: 24}
+    precision: 1
+  - platform: statistics
+    name: "GH Temp Avg 7d"
+    unique_id: gh_temp_avg_7d
+    entity_id: sensor.greenhouse_climate_2_temperature
+    state_characteristic: mean
+    sampling_size: 25000
+    max_age: {days: 7}
+    precision: 1
+  - platform: statistics
+    name: "GH Temp Min 24h"
+    unique_id: gh_temp_min_24h
+    entity_id: sensor.greenhouse_climate_2_temperature
+    state_characteristic: value_min
+    sampling_size: 2000
+    max_age: {hours: 24}
+    precision: 1
+  - platform: statistics
+    name: "GH Temp Max 24h"
+    unique_id: gh_temp_max_24h
+    entity_id: sensor.greenhouse_climate_2_temperature
+    state_characteristic: value_max
+    sampling_size: 2000
+    max_age: {hours: 24}
+    precision: 1
+  - platform: statistics
+    name: "GH Humidity Min 24h"
+    unique_id: gh_humidity_min_24h
+    entity_id: sensor.greenhouse_climate_2_humidity
+    state_characteristic: value_min
+    sampling_size: 2000
+    max_age: {hours: 24}
+    precision: 0
+  - platform: statistics
+    name: "GH Humidity Max 24h"
+    unique_id: gh_humidity_max_24h
+    entity_id: sensor.greenhouse_climate_2_humidity
+    state_characteristic: value_max
+    sampling_size: 2000
+    max_age: {hours: 24}
+    precision: 0
+  - platform: statistics
+    name: "GH Temp Day Avg"
+    unique_id: gh_temp_day_avg
+    entity_id: sensor.gh_temp_day
+    state_characteristic: mean
+    sampling_size: 2000
+    max_age: {hours: 24}
+    precision: 1
+  - platform: statistics
+    name: "GH Temp Night Avg"
+    unique_id: gh_temp_night_avg
+    entity_id: sensor.gh_temp_night
+    state_characteristic: mean
+    sampling_size: 2000
+    max_age: {hours: 24}
+    precision: 1
+  - platform: history_stats
+    name: "GH Water Ontime 24h"
+    unique_id: gh_water_ontime_24h
+    entity_id: switch.greenhouse_shelly_watering
+    state: "on"
+    type: time
+    end: "{{ now() }}"
+    duration: {hours: 24}
+  - platform: history_stats
+    name: "GH Water Ontime 7d"
+    unique_id: gh_water_ontime_7d
+    entity_id: switch.greenhouse_shelly_watering
+    state: "on"
+    type: time
+    end: "{{ now() }}"
+    duration: {days: 7}
+  - platform: history_stats
+    name: "GH Pollination Window 24h"
+    unique_id: gh_pollination_window_24h
+    entity_id: binary_sensor.gh_in_pollination_window
+    state: "on"
+    type: time
+    end: "{{ now() }}"
+    duration: {hours: 24}
