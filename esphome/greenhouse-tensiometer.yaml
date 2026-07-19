@@ -8,8 +8,12 @@ substitutions:
   fault_pin_v_min: "0.30"   # sensor V below this = TX-E unpowered/disconnected -> report fault (NaN), not a bogus 100 kPa (healthy floor is 0.5 V = 100 kPa)
   # ---- 5 V rail monitor (ADS1115 A2, no divider: gain 6.144 spans 5 V and the
   # ADS1115 input limit is VDD+0.3, so A2 may sit directly on the 5 V rail) ----
-  rail_v_min: "4.60"
-  rail_v_max: "5.40"
+  # Rail is a bench-adjusted industrial supply set to exactly 5.00 V, so this is
+  # a tight +/-2% window. The window width IS the max undetected phantom tension:
+  # the TX-E is ratiometric, so a rail at R reads (4.5 - 4.5*R/5)*25 kPa at true
+  # zero -> +/-2% = +/-2.25 kPa. Widen only with that trade-off in mind.
+  rail_v_min: "4.90"
+  rail_v_max: "5.10"
   rail_guard_enabled: "false"   # ships FALSE. Wire A2 -> 5 V rail, confirm the "5V Rail" sensor reads ~5 V, THEN set true and re-flash.
 
 esphome:
