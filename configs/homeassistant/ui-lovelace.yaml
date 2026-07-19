@@ -37,13 +37,13 @@ views:
         title: Controls
         show_header_toggle: false
         entities:
-          - entity: switch.greenhouse_6_vanning
+          - entity: switch.greenhouse_shelly_watering
             name: "Vanning (#6)"
             icon: mdi:water
-          - entity: switch.plugg_3_vifte_endevegg_ost
+          - entity: switch.greenhouse_shelly_fan_east
             name: "Vifte endevegg øst (#3)"
             icon: mdi:fan
-          - entity: switch.plugg_5_vifte_endevegg_vest
+          - entity: switch.greenhouse_shelly_fan_west
             name: "Vifte endevegg vest (#5)"
             icon: mdi:fan
 
@@ -121,11 +121,11 @@ views:
         entities:
           - entity: input_boolean.gh_automation_enabled
             name: Automation enabled
-          - entity: switch.plugg_3_vifte_endevegg_ost
+          - entity: switch.greenhouse_shelly_fan_east
             name: Fan øst
-          - entity: switch.plugg_5_vifte_endevegg_vest
+          - entity: switch.greenhouse_shelly_fan_west
             name: Fan vest
-          - entity: switch.greenhouse_6_vanning
+          - entity: switch.greenhouse_shelly_watering
             name: Vanning
       - type: entities
         title: Thresholds (tune here)
@@ -159,7 +159,7 @@ views:
             name: "Water minutes today"
           - entity: input_datetime.gh_last_pulse_end
             name: "Last pulse ended"
-          - entity: switch.greenhouse_6_vanning
+          - entity: switch.greenhouse_shelly_watering
             name: "Pump (Vanning #6)"
 
   # ==================== METRICS ====================

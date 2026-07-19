@@ -48,18 +48,18 @@
         h_max: "{{ states('input_number.gh_humidity_max') | float(80) }}"
         h_off: "{{ states('input_number.gh_humidity_off') | float(72) }}"
         day: "{{ is_state('sun.sun','above_horizon') }}"
-        fans_on: "{{ is_state('switch.plugg_3_vifte_endevegg_ost','on') }}"
+        fans_on: "{{ is_state('switch.greenhouse_shelly_fan_east','on') }}"
         want_on: "{{ (t >= on_t) or (day and h >= h_max) or ((not day) and h > 85) }}"
         want_off: "{{ (t <= off_t) and ((day and h <= h_off) or ((not day) and h <= 83)) }}"
     - choose:
         - conditions: "{{ want_on and not fans_on }}"
           sequence:
             - service: switch.turn_on
-              target: {entity_id: [switch.plugg_3_vifte_endevegg_ost, switch.plugg_5_vifte_endevegg_vest]}
+              target: {entity_id: [switch.greenhouse_shelly_fan_east, switch.greenhouse_shelly_fan_west]}
         - conditions: "{{ want_off and fans_on }}"
           sequence:
             - service: switch.turn_off
-              target: {entity_id: [switch.plugg_3_vifte_endevegg_ost, switch.plugg_5_vifte_endevegg_vest]}
+              target: {entity_id: [switch.greenhouse_shelly_fan_east, switch.greenhouse_shelly_fan_west]}
 
 - id: gh_fan_circulation
   alias: "GH Fan circulation (daylight)"
@@ -75,17 +75,17 @@
       entity_id: sun.sun
       state: "above_horizon"
     - condition: state
-      entity_id: switch.plugg_3_vifte_endevegg_ost
+      entity_id: switch.greenhouse_shelly_fan_east
       state: "off"
   action:
     - service: switch.turn_on
-      target: {entity_id: [switch.plugg_3_vifte_endevegg_ost, switch.plugg_5_vifte_endevegg_vest]}
+      target: {entity_id: [switch.greenhouse_shelly_fan_east, switch.greenhouse_shelly_fan_west]}
     - delay: "00:10:00"
     # only turn back off if the climate automation didn't latch them on for cooling
     - condition: template
       value_template: "{{ (states('sensor.greenhouse_climate_2_temperature')|float(0)) < (states('input_number.gh_fan_on_temp')|float(25)) and (states('sensor.greenhouse_climate_2_humidity')|float(0)) < (states('input_number.gh_humidity_max')|float(80)) }}"
     - service: switch.turn_off
-      target: {entity_id: [switch.plugg_3_vifte_endevegg_ost, switch.plugg_5_vifte_endevegg_vest]}
+      target: {entity_id: [switch.greenhouse_shelly_fan_east, switch.greenhouse_shelly_fan_west]}
 
 # ==================== TASK 4: SAFETY ALERTS ====================
 
@@ -265,10 +265,10 @@
            or states('sensor.greenhouse_tensiometer_average_kpa') in ['unavailable','unknown'] }}
   action:
     - service: switch.turn_on
-      target: {entity_id: switch.greenhouse_6_vanning}
+      target: {entity_id: switch.greenhouse_shelly_watering}
     - delay: "00:10:00"
     - service: switch.turn_off
-      target: {entity_id: switch.greenhouse_6_vanning}
+      target: {entity_id: switch.greenhouse_shelly_watering}
 
 - id: gh_water_1000
   alias: "GH Water 10:00 (8m)"
@@ -289,10 +289,10 @@
            or states('sensor.greenhouse_tensiometer_average_kpa') in ['unavailable','unknown'] }}
   action:
     - service: switch.turn_on
-      target: {entity_id: switch.greenhouse_6_vanning}
+      target: {entity_id: switch.greenhouse_shelly_watering}
     - delay: "00:08:00"
     - service: switch.turn_off
-      target: {entity_id: switch.greenhouse_6_vanning}
+      target: {entity_id: switch.greenhouse_shelly_watering}
 
 - id: gh_water_1200
   alias: "GH Water 12:00 (7m)"
@@ -313,17 +313,17 @@
            or states('sensor.greenhouse_tensiometer_average_kpa') in ['unavailable','unknown'] }}
   action:
     - service: switch.turn_on
-      target: {entity_id: switch.greenhouse_6_vanning}
+      target: {entity_id: switch.greenhouse_shelly_watering}
     - delay: "00:07:00"
     - service: switch.turn_off
-      target: {entity_id: switch.greenhouse_6_vanning}
+      target: {entity_id: switch.greenhouse_shelly_watering}
 
 - id: gh_water_watchdog
   alias: "GH Watering watchdog (force-off stuck pump)"
   mode: single
   trigger:
     - platform: state
-      entity_id: switch.greenhouse_6_vanning
+      entity_id: switch.greenhouse_shelly_watering
       to: "on"
       for: "00:16:00"
   condition:
@@ -332,7 +332,7 @@
       state: "on"
   action:
     - service: switch.turn_off
-      target: {entity_id: switch.greenhouse_6_vanning}
+      target: {entity_id: switch.greenhouse_shelly_watering}
     - service: script.gh_notify
       data:
         title: "💧 Watering watchdog"
@@ -343,11 +343,11 @@
   mode: queued
   trigger:
     - platform: state
-      entity_id: switch.greenhouse_6_vanning
+      entity_id: switch.greenhouse_shelly_watering
       to: "on"
       id: started
     - platform: state
-      entity_id: switch.greenhouse_6_vanning
+      entity_id: switch.greenhouse_shelly_watering
       to: "off"
       id: stopped
   action:
@@ -439,8 +439,8 @@
            <= (states('input_number.gh_water_daily_cap_minutes') | float(90)) }}
   action:
     - service: switch.turn_on
-      target: {entity_id: switch.greenhouse_6_vanning}
+      target: {entity_id: switch.greenhouse_shelly_watering}
     - delay:
         minutes: "{{ states('input_number.gh_pulse_minutes') | int(13) }}"
     - service: switch.turn_off
-      target: {entity_id: switch.greenhouse_6_vanning}
+      target: {entity_id: switch.greenhouse_shelly_watering}
