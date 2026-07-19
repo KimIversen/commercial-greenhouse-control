@@ -79,7 +79,8 @@ rotation.
 
 ### Part C — Config changes
 
-**`configs/homeassistant/automations.yaml`** — 6 fan references, 14 watering references.
+**`configs/homeassistant/automations.yaml`** — 10 fan references, 12 watering references
+(22 occurrences over 18 lines; several lines target both fan entities).
 Also corrects a stale string in `gh_water_watchdog`: the trigger was changed 22 → 16 min but the
 alert text still reads "was on >22 min".
 
