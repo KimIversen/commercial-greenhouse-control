@@ -1,6 +1,6 @@
 # Shelly 1PM Gen3 Plug Migration Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Repoint every watering and fan reference in Home Assistant from the three dead Tapo plugs to the newly installed Shelly 1PM Gen3 devices, fixing an inverted entity-ID mapping and adding a power-verified pump watchdog.
 
@@ -37,7 +37,7 @@ The mapping is 1:1 and unambiguous, so this is a mechanical global replace. 31 o
 **Interfaces:**
 - Produces: the three new `switch.greenhouse_shelly_*` entity IDs, referenced by every later task.
 
-- [ ] **Step 1: Record the "before" reference counts**
+- [x] **Step 1: Record the "before" reference counts**
 
 Count **occurrences**, not matching lines — several lines carry both fan entities, so `grep -c` undercounts.
 
@@ -64,7 +64,7 @@ Note the patterns are `switch.`-prefixed on purpose. The Plug Health card also c
 `binary_sensor.greenhouse_6_vanning_cloud_connection` and friends, which must **not** be caught by
 the Task 1 replace — those entities have no Shelly equivalent and are removed wholesale in Task 2.
 
-- [ ] **Step 2: Apply the replacement**
+- [x] **Step 2: Apply the replacement**
 
 ```bash
 cd /Users/kimiversen/solstad/commercial-greenhouse-control
@@ -81,7 +81,7 @@ done
 
 Note `sed -i ''` — BSD/macOS sed requires the empty backup argument.
 
-- [ ] **Step 3: Verify zero old references remain and counts carried over**
+- [x] **Step 3: Verify zero old references remain and counts carried over**
 
 ```bash
 grep -rn "switch\.greenhouse_6_vanning\|switch\.plugg_" configs/ ; echo "exit=$?"
@@ -105,7 +105,7 @@ done
 
 Expected: `22`, `7`, `2` — the same counts as Step 1, now on the new entity IDs.
 
-- [ ] **Step 4: Verify YAML still parses**
+- [x] **Step 4: Verify YAML still parses**
 
 ```bash
 python3 -c "
@@ -121,7 +121,7 @@ for f in ['configs/homeassistant/automations.yaml','configs/homeassistant/ui-lov
 
 Expected: three `OK` lines. (`ui-lovelace.yaml` may raise on the `!include` tag — if so, that is pre-existing and acceptable; confirm by running the same check on `git stash`'d original.)
 
-- [ ] **Step 5: Confirm the east/west split landed on the right automations**
+- [x] **Step 5: Confirm the east/west split landed on the right automations**
 
 The fan-state check must read the **east** plug, matching the pre-migration behaviour:
 
@@ -131,7 +131,7 @@ grep -n "fans_on:\|entity_id: switch.greenhouse_shelly_fan" configs/homeassistan
 
 Expected: the `fans_on:` template and the `gh_fan_circulation` condition both reference `switch.greenhouse_shelly_fan_east`; the `turn_on`/`turn_off` targets list both `fan_east` and `fan_west`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add configs/homeassistant/automations.yaml configs/homeassistant/ui-lovelace.yaml configs/homeassistant/packages/greenhouse_metrics.yaml
@@ -156,7 +156,7 @@ The Tapo card used `cloud_connection` / `signal_level` / `overheated`, none of w
 - Consumes: the switch entity IDs from Task 1.
 - Produces: dashboard rows for `sensor.greenhouse_shelly_<role>_effekt`, `_signalstyrke`, `_temperatur`, `_spenning`. These entity IDs are created by the registry rename in Task 5 — until then they will render as "Entitet ikke funnet", which is expected.
 
-- [ ] **Step 1: Replace the Plug Health card**
+- [x] **Step 1: Replace the Plug Health card**
 
 Find the card titled `Plug Health` and replace the whole card (from `- type: entities` through the last `Overheated` row) with:
 
@@ -202,7 +202,7 @@ Find the card titled `Plug Health` and replace the whole card (from `- type: ent
             name: "Overbelastning"
 ```
 
-- [ ] **Step 2: Add a Plug Power card immediately after the Controls card**
+- [x] **Step 2: Add a Plug Power card immediately after the Controls card**
 
 The Controls card ends with the `Vifte endevegg vest` entry. Insert directly after it, at the same indentation as `- type: entities`:
 
@@ -223,7 +223,7 @@ The Controls card ends with the `Vifte endevegg vest` entry. Insert directly aft
             icon: mdi:fan
 ```
 
-- [ ] **Step 3: Update the stale Controls card comment and entry names**
+- [x] **Step 3: Update the stale Controls card comment and entry names**
 
 The Controls card is preceded by `# --- Controls (Tapo plugs) ---`. Change to `# --- Controls (Shelly 1PM plugs) ---`. Then update the three display names, which still carry Tapo plug numbers:
 
@@ -239,11 +239,11 @@ The Controls card is preceded by `# --- Controls (Tapo plugs) ---`. Change to `#
             icon: mdi:fan
 ```
 
-- [ ] **Step 4: Update the closed-loop card's pump label**
+- [x] **Step 4: Update the closed-loop card's pump label**
 
 Find `name: "Pump (Vanning #6)"` and change to `name: "Pumpe (Vanning)"`.
 
-- [ ] **Step 5: Verify no Tapo-era entity or label survives**
+- [x] **Step 5: Verify no Tapo-era entity or label survives**
 
 ```bash
 grep -n "cloud_connection\|signal_level\|overheated\|#6\|(#3)\|(#5)\|Tapo" configs/homeassistant/ui-lovelace.yaml ; echo "exit=$?"
@@ -251,7 +251,7 @@ grep -n "cloud_connection\|signal_level\|overheated\|#6\|(#3)\|(#5)\|Tapo" confi
 
 Expected: no output, `exit=1`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add configs/homeassistant/ui-lovelace.yaml
@@ -279,7 +279,7 @@ A commanded relay and a dead pump are indistinguishable to HA today. The 1PM's p
 - Consumes: `switch.greenhouse_shelly_watering` (Task 1), `sensor.greenhouse_shelly_watering_effekt` (Task 5 rename — already correctly named, no rename needed), `script.gh_notify` (existing; takes `title` and `message` in `data`).
 - Produces: `input_number.gh_pump_min_watts`, automation id `gh_water_no_flow_alert`.
 
-- [ ] **Step 1: Append the threshold helper**
+- [x] **Step 1: Append the threshold helper**
 
 Append to the end of `configs/homeassistant/sensors/automation_numbers.yaml` (flat mapping — no leading list dash):
 
@@ -297,7 +297,7 @@ gh_pump_min_watts:
 
 Default 30 W is derived from the measured pump draw of ~108 W steady (174 W inrush) — far below true draw, far above sensor noise.
 
-- [ ] **Step 2: Fix the stale watchdog message**
+- [x] **Step 2: Fix the stale watchdog message**
 
 In `configs/homeassistant/automations.yaml`, the `gh_water_watchdog` trigger fires at `00:16:00` but its message still says 22 minutes. Change:
 
@@ -311,7 +311,7 @@ to:
         message: "Vanning pump was on >16 min — forced off (possible stuck pulse after a restart)."
 ```
 
-- [ ] **Step 3: Append the new automation**
+- [x] **Step 3: Append the new automation**
 
 Append to the end of `configs/homeassistant/automations.yaml`:
 
@@ -353,7 +353,7 @@ Append to the end of `configs/homeassistant/automations.yaml`:
 
 Note the `float(9999)` default: if the state is somehow unparseable the comparison fails safe (no alert) rather than firing spuriously.
 
-- [ ] **Step 4: Expose the helper on the Automation view**
+- [x] **Step 4: Expose the helper on the Automation view**
 
 In `configs/homeassistant/ui-lovelace.yaml`, find the `Watering – tensiometer loop` card and add after `- input_number.gh_water_daily_cap_minutes`:
 
@@ -361,7 +361,7 @@ In `configs/homeassistant/ui-lovelace.yaml`, find the `Watering – tensiometer 
           - input_number.gh_pump_min_watts
 ```
 
-- [ ] **Step 5: Verify YAML parses and the automation id is unique**
+- [x] **Step 5: Verify YAML parses and the automation id is unique**
 
 ```bash
 python3 -c "
@@ -383,7 +383,7 @@ OK — <N> automations, ids unique
 OK — gh_pump_min_watts present, initial=30
 ```
 
-- [ ] **Step 6: Verify the stale message is gone**
+- [x] **Step 6: Verify the stale message is gone**
 
 ```bash
 grep -n ">22 min" configs/homeassistant/automations.yaml ; echo "exit=$?"
@@ -391,7 +391,7 @@ grep -n ">22 min" configs/homeassistant/automations.yaml ; echo "exit=$?"
 
 Expected: no output, `exit=1`.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add configs/homeassistant/automations.yaml configs/homeassistant/sensors/automation_numbers.yaml configs/homeassistant/ui-lovelace.yaml
@@ -414,7 +414,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 **Files:**
 - Modify: `CLAUDE.md`
 
-- [ ] **Step 1: Update the network address table**
+- [x] **Step 1: Update the network address table**
 
 In the "Network Configuration" list, add after the `192.168.10.162` line:
 
@@ -424,7 +424,7 @@ In the "Network Configuration" list, add after the `192.168.10.162` line:
   - 192.168.10.194: Shelly - Watering (Shelly 1PM Gen3, irrigation pump)
 ```
 
-- [ ] **Step 2: Add a Shelly section under "System Overview"**
+- [x] **Step 2: Add a Shelly section under "System Overview"**
 
 Append to the end of the "### ESP32 Device Types" section:
 
@@ -445,7 +445,7 @@ Power metering enables `gh_water_no_flow_alert`, which detects a pump that is co
 drawing no current — a failure previously invisible to HA.
 ```
 
-- [ ] **Step 3: Verify no stale Tapo plug references remain in the doc**
+- [x] **Step 3: Verify no stale Tapo plug references remain in the doc**
 
 The goal is that no reference survives implying the Tapo plugs are still *operational*. The
 historical sentence added in Step 2 deliberately names them, so exclude that line:
@@ -460,7 +460,7 @@ Expected: no output, `exit=1`.
 cannot satisfy. Keeping the hardware lineage in the docs was judged more valuable than a clean
 grep — the previous plug swap's hard-won lesson was precisely about knowing the *old* names.)
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add CLAUDE.md
@@ -484,7 +484,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - Consumes: everything from Tasks 1-4.
 - Produces: live entity IDs `switch.greenhouse_shelly_fan_{east,west}` correctly bound to their physical fans, and enabled diagnostics `sensor.greenhouse_shelly_<role>_{signalstyrke,temperatur,spenning}`.
 
-- [ ] **Step 1: Full-directory dry run to catch other undeployed divergence**
+- [x] **Step 1: Full-directory dry run to catch other undeployed divergence**
 
 ```bash
 cd /Users/kimiversen/solstad/commercial-greenhouse-control
@@ -495,7 +495,7 @@ rsync -avzn --itemize-changes \
 
 Expected: only the four files from Tasks 1-4 listed. If anything else appears, STOP and report it to the user before deploying — a previous session shipped `ui-lovelace.yaml` ahead of its helpers and broke the dashboard.
 
-- [ ] **Step 2: Deploy the four files**
+- [x] **Step 2: Deploy the four files**
 
 ```bash
 cd /Users/kimiversen/solstad/commercial-greenhouse-control
@@ -505,7 +505,7 @@ for f in automations.yaml ui-lovelace.yaml packages/greenhouse_metrics.yaml sens
 done
 ```
 
-- [ ] **Step 3: Validate config while HA is still up**
+- [x] **Step 3: Validate config while HA is still up**
 
 ```bash
 ssh -i "$HOME/.ssh/{bitbucket_mb_air_15}" -o IdentitiesOnly=yes greenhouse \
@@ -514,7 +514,7 @@ ssh -i "$HOME/.ssh/{bitbucket_mb_air_15}" -o IdentitiesOnly=yes greenhouse \
 
 Expected: `EXIT=0`. If non-zero, fix locally and redeploy before going further — do not stop HA with a broken config.
 
-- [ ] **Step 4: Back up the entity registry and stop HA**
+- [x] **Step 4: Back up the entity registry and stop HA**
 
 ```bash
 ssh -i "$HOME/.ssh/{bitbucket_mb_air_15}" -o IdentitiesOnly=yes greenhouse '
@@ -525,7 +525,7 @@ ssh -i "$HOME/.ssh/{bitbucket_mb_air_15}" -o IdentitiesOnly=yes greenhouse '
 
 Expected: `STOPPED`. The backup must be taken **before** the stop so it captures the live state.
 
-- [ ] **Step 5: Rewrite the registry offline**
+- [x] **Step 5: Rewrite the registry offline**
 
 Renames are computed in memory and written once, so ordering cannot cause a collision. The script validates uniqueness before writing and refuses to save otherwise.
 
@@ -608,7 +608,7 @@ ssh -i "$HOME/.ssh/{bitbucket_mb_air_15}" -o IdentitiesOnly=yes greenhouse \
 
 If that path does not exist, find the real one with `docker inspect greenhouse_homeassistant --format '{{json .Mounts}}'` and substitute it.
 
-- [ ] **Step 6: Start HA**
+- [x] **Step 6: Start HA**
 
 ```bash
 ssh -i "$HOME/.ssh/{bitbucket_mb_air_15}" -o IdentitiesOnly=yes greenhouse \
@@ -617,7 +617,7 @@ ssh -i "$HOME/.ssh/{bitbucket_mb_air_15}" -o IdentitiesOnly=yes greenhouse \
 
 Wait ~60 s for startup before verifying.
 
-- [ ] **Step 7: Verify the entities exist and are bound correctly**
+- [x] **Step 7: Verify the entities exist and are bound correctly**
 
 ```bash
 ssh -i "$HOME/.ssh/{bitbucket_mb_air_15}" -o IdentitiesOnly=yes greenhouse '
@@ -646,7 +646,7 @@ docker exec -e P="$PW" -e Q="$Q" greenhouse_mariadb sh -c '"'"'mysql -uroot -p"$
 
 Expected: three rows reading `on` or `off` — **not** `unavailable`.
 
-- [ ] **Step 8: Confirm the physical east/west mapping survived the rename**
+- [x] **Step 8: Confirm the physical east/west mapping survived the rename**
 
 Pulse the east fan via its local API and confirm the entity HA now calls "east" is the one that moves:
 
@@ -659,7 +659,7 @@ curl -s -m 4 "http://192.168.10.187/rpc/Switch.Set?id=0&on=false"'
 
 Then in HA, confirm `switch.greenhouse_shelly_fan_east` was the entity that changed state (Developer Tools → States, or the logbook). Expected draw ~113 W.
 
-- [ ] **Step 9: Verify the no-flow alert stays silent on a healthy pulse**
+- [x] **Step 9: Verify the no-flow alert stays silent on a healthy pulse**
 
 ```bash
 ssh -i "$HOME/.ssh/{bitbucket_mb_air_15}" -o IdentitiesOnly=yes greenhouse '
@@ -671,11 +671,11 @@ curl -s -m 4 "http://192.168.10.194/rpc/Switch.Set?id=0&on=false"'
 
 The pulse runs past the automation's 2-minute settle window. Expected: draw ~108 W, and **no** "ingen strømtrekk" notification. Then check the automation trace (Settings → Automations → *GH Watering no-flow alert* → Traces) — it should show the trigger fired and the power condition correctly blocked the action.
 
-- [ ] **Step 10: Confirm the dashboard renders clean**
+- [x] **Step 10: Confirm the dashboard renders clean**
 
 Open the dashboard and check the Overview, Automation and System Health views for "Entitet ikke funnet" rows. Expected: none. The Plug Health card should show signal, temperature and voltage for all three plugs.
 
-- [ ] **Step 11: Commit the plan checkboxes and report**
+- [x] **Step 11: Commit the plan checkboxes and report**
 
 ```bash
 git add docs/superpowers/plans/2026-07-19-shelly-plug-migration.md
