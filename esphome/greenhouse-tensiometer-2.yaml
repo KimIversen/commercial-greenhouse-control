@@ -6,6 +6,11 @@ substitutions:
   i2c_scl: "GPIO7"       # XIAO ESP32-C3 D5 -> ADS1115 SCL
   update_interval: "30s"
   fault_pin_v_min: "0.30"   # sensor V below this = TX-E unpowered/disconnected -> report fault (NaN), not a bogus 100 kPa (healthy floor is 0.5 V = 100 kPa)
+  # ---- 5 V rail monitor (ADS1115 A2, no divider: gain 6.144 spans 5 V and the
+  # ADS1115 input limit is VDD+0.3, so A2 may sit directly on the 5 V rail) ----
+  rail_v_min: "4.60"
+  rail_v_max: "5.40"
+  rail_guard_enabled: "false"   # ships FALSE. Wire A2 -> 5 V rail, confirm the "5V Rail" sensor reads ~5 V, THEN set true and re-flash.
 
 esphome:
   name: ${device_name}
@@ -90,6 +95,16 @@ sensor:
     internal: true
     filters:
       - sliding_window_moving_average: { window_size: 8, send_every: 1 }
+  # A2 sits directly on the 5 V excitation rail (no divider — see substitutions).
+  # Reads ~0 V until the jumper is fitted; harmless while rail_guard_enabled is false.
+  - platform: ads1115
+    id: rail_pin_v
+    multiplexer: A2_GND
+    gain: 6.144
+    update_interval: ${update_interval}
+    internal: true
+    filters:
+      - sliding_window_moving_average: { window_size: 8, send_every: 1 }
 
   # ---- Diagnostic: exposed sensor voltage (true 0.5-4.5 V, for calibration / fault-spotting) ----
   - platform: template
@@ -112,6 +127,16 @@ sensor:
     entity_category: diagnostic
     update_interval: ${update_interval}
     lambda: 'return id(t2_pin_v).state;'
+  - platform: template
+    name: "5V Rail"
+    id: rail_volts
+    unit_of_measurement: "V"
+    device_class: voltage
+    state_class: measurement
+    accuracy_decimals: 3
+    entity_category: diagnostic
+    update_interval: ${update_interval}
+    lambda: 'return id(rail_pin_v).state;'
 
   # ---- Tension in kPa (INVERTED calibrate_linear; clamp 0..100) ----
   - platform: template
@@ -124,6 +149,14 @@ sensor:
     update_interval: ${update_interval}
     lambda: |-
       float v = id(t1_pin_v).state;
+      float rail = id(rail_pin_v).state;
+      // Rail guard: the TX-E output is RATIOMETRIC to its excitation supply, so a
+      // sagging or back-fed 5 V rail is indistinguishable from drying soil at the
+      // sensor pin — it yields a plausible, stable, WRONG tension that the dry-floor
+      // guard below can never catch (observed 2026-07-19: a 4.07 V rail made unprimed
+      // bench sensors report a rock-steady 13.8 kPa). Only enforced once A2 is wired.
+      if (${rail_guard_enabled} && !isnan(rail) &&
+          (rail < ${rail_v_min}f || rail > ${rail_v_max}f)) return NAN;
       // Fault guard: an unpowered/disconnected TX-E reads ~0 V, which the inverted
       // calibration would map to a bogus "100 kPa" (bone dry). Guard below the
       // 0.5 V (=100 kPa) dry floor -> publish NaN (unavailable), not a fake dry reading.
@@ -148,6 +181,10 @@ sensor:
     update_interval: ${update_interval}
     lambda: |-
       float v = id(t2_pin_v).state;
+      float rail = id(rail_pin_v).state;
+      // Rail guard: see channel 1 — a wrong-but-stable excitation rail reads as fake tension.
+      if (${rail_guard_enabled} && !isnan(rail) &&
+          (rail < ${rail_v_min}f || rail > ${rail_v_max}f)) return NAN;
       // Fault guard: see channel 1 — <0.30 V sensor means unpowered/disconnected, not 100 kPa.
       if (!isnan(v) && v < ${fault_pin_v_min}f) return NAN;
       return v;
@@ -207,6 +244,18 @@ binary_sensor:
     lambda: |-
       if (isnan(id(t2_kpa).state)) return {};
       return id(t2_kpa).state > 80.0;
+  # Always reports, even while rail_guard_enabled is false — so the rail can be
+  # verified before the guard is armed, and a rail fault is visible either way.
+  - platform: template
+    name: "Rail Fault"
+    id: rail_fault
+    icon: mdi:flash-alert
+    device_class: problem
+    entity_category: diagnostic
+    lambda: |-
+      float rail = id(rail_pin_v).state;
+      if (isnan(rail)) return {};
+      return (rail < ${rail_v_min}f || rail > ${rail_v_max}f);
 
 button:
   - platform: restart
