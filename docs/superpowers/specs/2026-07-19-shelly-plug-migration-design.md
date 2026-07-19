@@ -59,8 +59,10 @@ Renames must precede the config references, and are **order-dependent**: `fan_ea
 2. Stop HA — it rewrites the registry from memory on exit, so it must be down for an offline edit
 3. Rename .164's 10 entities `..._fan_east*` → `..._fan_west*`
 4. Rename .187's 10 entities `..._fan_east*_2` → `..._fan_east*`
-5. Enable the 9 disabled diagnostics (`signalstyrke`, `temperatur`, `spenning` × 3 devices) and
-   give them readable slugs in place of `sensor.shelly1pmg3_<mac>_*`
+5. Enable the 9 disabled diagnostics (`signalstyrke`, `temperatur`, `spenning` × 3 devices),
+   renaming them from `sensor.shelly1pmg3_<mac>_<metric>` to
+   `sensor.greenhouse_shelly_<role>_<metric>`, where `<role>` is `watering`, `fan_east` or
+   `fan_west` — matching the switch slugs
 6. Start HA
 
 Rejected alternative: the websocket API with a long-lived token avoids downtime, but a restart is
